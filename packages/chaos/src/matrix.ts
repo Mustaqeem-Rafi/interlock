@@ -286,6 +286,56 @@ export async function runMatrix(options: MatrixOptions): Promise<MatrixResults> 
   return { startedAt, durationMs: Date.now() - start, trialsPerPoint: options.trials, summaries };
 }
 
+/**
+ * Reject anything we did not mean.
+ *
+ * This runner writes RESULTS.chaos.md, so a flag it silently ignores becomes a
+ * published number describing an experiment nobody ran. `--trails 20 -full`
+ * was accepted in full: the misspelling was dropped, the single dash was
+ * dropped, and the matrix quietly fell back to one fault profile and reported
+ * a clean sweep — the exact shape of failure ADR-0004 exists to describe.
+ *
+ * An unknown flag is therefore fatal. Guessing what the operator meant is how
+ * a weaker experiment gets mistaken for a stronger one.
+ */
+const HELP = `chaos matrix - kill the gate mid-refund and count what reached the rail.
+
+USAGE
+  pnpm chaos:matrix [--trials <n>] [--full]
+
+OPTIONS
+  --trials <n>  Trials per cell. Default 20.
+  --full        All 5 fault profiles rather than the clean one. Without this the
+                rail never misbehaves, which is a much weaker experiment.
+  --help
+
+The guarantee asserted is "never two, and never unknown" - deliberately not
+"always one". Killing before the ledger write correctly ends with no refund.
+`;
+
+const KNOWN_FLAGS = new Set(['--trials', '--full', '--help']);
+
+export function assertKnownFlags(argv: readonly string[]): void {
+  // -1 when absent, and -1 + 1 is index 0 — which would excuse the first
+  // argument from checking, the very position a mistyped flag sits in.
+  const valueAt = argv.indexOf('--trials') === -1 ? -1 : argv.indexOf('--trials') + 1;
+  const unknown = argv.filter(
+    (arg, index) => arg.startsWith('-') && !KNOWN_FLAGS.has(arg) && index !== valueAt,
+  );
+  if (unknown.length === 0) return;
+  const near = (arg: string): string => {
+    const bare = arg.replace(/^-+/, '');
+    const guess = [...KNOWN_FLAGS].find(
+      (known) => known.replace(/^--/, '').startsWith(bare.slice(0, 3)) || known === `--${bare}`,
+    );
+    return guess === undefined ? arg : `${arg} (did you mean ${guess}?)`;
+  };
+  throw new ChaosConfigError(
+    `unknown option(s): ${unknown.map(near).join(', ')}. ` +
+      `Known options are ${[...KNOWN_FLAGS].join(', ')}.`,
+  );
+}
+
 export function parseTrials(argv: readonly string[]): number {
   const flag = argv.indexOf('--trials');
   if (flag === -1) return 20;
@@ -303,6 +353,11 @@ export function resultsPath(): string {
 }
 
 export async function main(argv: readonly string[]): Promise<number> {
+  if (argv.includes('--help')) {
+    process.stdout.write(HELP);
+    return 0;
+  }
+  assertKnownFlags(argv);
   const trials = parseTrials(argv);
   const full = argv.includes('--full');
   const profiles = full ? FAULT_PROFILES : [FAULT_PROFILES[0]!];
