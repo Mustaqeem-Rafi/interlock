@@ -159,6 +159,27 @@ export interface IntentRepository {
     updatedSince?: number;
     limit?: number;
   }): IntentRow[];
+  /**
+   * What has actually left, and what it cost, inside a time window.
+   *
+   * Gate 3 reads this. Only APPLIED intents count: an attempt that was blocked
+   * or is still unresolved has not spent anything, and counting it would let a
+   * failed call consume the budget of a successful one. Fees come off the
+   * attempt rows, which carry what the rail actually charged rather than
+   * anything we computed from a rate.
+   */
+  windowTotals(input: {
+    merchant_id: string;
+    tool?: string;
+    since: number;
+    until: number;
+  }): WindowTotals;
+}
+
+export interface WindowTotals {
+  readonly calls: number;
+  readonly amount_minor: number;
+  readonly fee_minor: number;
 }
 
 export function createIntentRepository(db: Db): IntentRepository {
@@ -423,6 +444,43 @@ export function createIntentRepository(db: Db): IntentRepository {
            ORDER BY lease_expires_at ASC LIMIT ?`,
         )
         .all(...states, nowMs, options.limit ?? 100) as IntentRow[];
+    },
+
+    windowTotals(input) {
+      const filterTool = input.tool === undefined ? '' : ' AND tool = @tool';
+      // Only bind what the statement actually names: SQLite rejects an unknown
+      // named parameter outright, so a stray `tool` binding fails every call.
+      const params: Record<string, number | string> = {
+        merchant_id: input.merchant_id,
+        since: input.since,
+        until: input.until,
+        ...(input.tool === undefined ? {} : { tool: input.tool }),
+      };
+      const moved = db
+        .prepare(
+          `SELECT COUNT(*) AS calls, COALESCE(SUM(amount_minor), 0) AS amount_minor
+             FROM intents
+            WHERE merchant_id = @merchant_id AND state = 'APPLIED'
+              AND updated_at >= @since AND updated_at < @until${filterTool}`,
+        )
+        .get(params) as { calls: number; amount_minor: number };
+
+      // Fees are read from the attempt the rail answered, never derived.
+      const spent = db
+        .prepare(
+          `SELECT COALESCE(SUM(COALESCE(a.fee_minor, 0) + COALESCE(a.tax_minor, 0)), 0) AS fee_minor
+             FROM intent_attempts a
+             JOIN intents i ON i.merchant_id = a.merchant_id AND i.sik = a.sik
+            WHERE a.merchant_id = @merchant_id AND a.outcome = 'APPLIED'
+              AND a.finished_at >= @since AND a.finished_at < @until${filterTool.replace('tool', 'i.tool')}`,
+        )
+        .get(params) as { fee_minor: number };
+
+      return {
+        calls: moved.calls,
+        amount_minor: moved.amount_minor,
+        fee_minor: spent.fee_minor,
+      };
     },
 
     list(options = {}) {

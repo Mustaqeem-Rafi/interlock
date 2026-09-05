@@ -10,6 +10,8 @@ import {
 import type { IntentRow, Store } from '@interlock/store';
 import { createG2Value } from '../gates/g2_value.js';
 import { G1_SCOPE } from '../gates/g1_scope.js';
+import { createG3Limits } from '../gates/g3_limits.js';
+import { checkManifestPin, createG6Provenance } from '../gates/g6_provenance.js';
 import { runLadder, type ModelGate } from '../gates/ladder.js';
 import { createReferentResolver, type ReferentResolver } from '../gates/resolver.js';
 import { nextState } from '../exactly-once/machine.js';
@@ -90,6 +92,8 @@ export function createEngine(options: EngineOptions): Engine {
   const nextRequestId = options.requestId ?? ((): string => `req_${String(++counter)}`);
 
   const g2 = createG2Value(resolver);
+  const g3 = createG3Limits(store);
+  const g6 = createG6Provenance();
 
   /** Look the applied refund up by its stamp, so a replay returns the real one. */
   async function findBySik(paymentId: string, sik: string): Promise<Refund | null> {
@@ -107,11 +111,21 @@ export function createEngine(options: EngineOptions): Engine {
     return null;
   }
 
-  async function issue(intent: IntentRow, out: OutcomeInput): Promise<CallToolResult> {
+  async function issue(
+    intent: IntentRow,
+    out: OutcomeInput,
+    tool: string,
+  ): Promise<CallToolResult> {
     let current = intent;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-      const outcome = await options.wal.issueRefund(current);
+      const outcome =
+        tool === 'create_refund'
+          ? await options.wal.issueRefund(current)
+          : await options.wal.issueSettlement(current);
 
+      if (outcome.kind === 'APPLIED_SETTLEMENT') {
+        return applied(out, outcome.settlement.id, outcome.settlement);
+      }
       if (outcome.kind === 'APPLIED') {
         return applied(out, outcome.refund.id, outcome.refund);
       }
@@ -119,10 +133,18 @@ export function createEngine(options: EngineOptions): Engine {
         return blocked(out, 'RAIL_REJECTED', outcome.error.message);
       }
 
-      // Ambiguous. Never retried; reconciled.
+      // Ambiguous. Never retried; reconciled — except for a settlement, which
+      // this rail gives us no way to identify afterwards. Guessing there would
+      // be worse than stopping, so it goes to a human.
+      if (tool !== 'create_refund') {
+        return held(out, 'UNSETTLED_SETTLEMENT',
+          'the settlement outcome is unknown and cannot be reconciled by stamp; a person must resolve it');
+      }
       const settled = await options.reconciler.settle(outcome.intent);
       if (settled.kind === 'APPLIED') {
-        const refund = await findBySik(current.subject_id, current.sik);
+        const refund = current.subject_id.startsWith('pay_')
+          ? await findBySik(current.subject_id, current.sik)
+          : null;
         return alreadyApplied(out, settled.rail_entity_id, refund);
       }
       if (settled.kind === 'QUARANTINED') {
@@ -149,7 +171,19 @@ export function createEngine(options: EngineOptions): Engine {
     async listTools() {
       const manifest = await options.upstream.manifest();
       const granted = new Set(Object.keys(mandate.scope.grants));
-      return manifest.tools
+
+      // Gate 6's first line of defence, and the reason the drift attack does
+      // not work: on a hash mismatch the agent is served the manifest a human
+      // approved, not the one upstream is serving now. It never sees the
+      // changed description, so there is nothing for it to be persuaded by.
+      const pin = checkManifestPin(mandate, manifest.sha256);
+      const pinnedTools = mandate.provenance.pinned_manifest;
+      const source =
+        !pin.matches && Array.isArray(pinnedTools) && pinnedTools.length > 0
+          ? (pinnedTools as typeof manifest.tools)
+          : manifest.tools;
+
+      return source
         .filter((tool) => granted.has(tool.name))
         .map((tool) => ({
           name: tool.name,
@@ -185,13 +219,23 @@ export function createEngine(options: EngineOptions): Engine {
 
       const manifest = await options.upstream.manifest();
       const amount = asInteger(args['amount_minor']) ?? asInteger(args['amount']);
-      const subject = asString(args['payment_id']) ?? asString(args['subject']);
+
+      // Not every money tool acts on a payment. A refund does; an instant
+      // settlement draws on the merchant balance and has no payment behind it.
+      // Demanding a payment_id for both refused every legitimate settlement —
+      // a false block, found by the benign controls in family E.
+      const subject =
+        name === 'create_refund'
+          ? (asString(args['payment_id']) ?? asString(args['subject']))
+          : `acct:${mandate.merchant_id}`;
 
       if (amount === null || subject === null) {
         return blocked(
           { requestId, sik: null, mandateHash, results: [] },
           'MALFORMED_ARGUMENTS',
-          'a refund needs an integer amount in minor units and a payment id',
+          name === 'create_refund'
+            ? 'a refund needs an integer amount in minor units and a payment id'
+            : `${name} needs an integer amount in minor units`,
         );
       }
 
@@ -210,13 +254,18 @@ export function createEngine(options: EngineOptions): Engine {
       });
 
       const ladder = await runLadder({
-        gates: [G1_SCOPE, g2],
+        // Cheapest and most decisive first: scope needs no rail read, value
+        // needs one, limits need a ledger scan, provenance needs the manifest.
+        gates: [G1_SCOPE, g2, g3, g6],
         ...(options.modelGates === undefined ? {} : { modelGates: options.modelGates }),
         context: { action, mandate, now: at },
       });
 
       const last = ladder.results.at(-1);
-      const resolved = resolvedSubject(ladder.results);
+      // Gate 2 puts the payment it resolved on its evidence. For a tool with no
+      // payment referent there is nothing to resolve, and the subject we were
+      // given is already the account it acts on.
+      const resolved = resolvedSubject(ladder.results) ?? (name === 'create_refund' ? null : subject);
 
       // Nothing was resolved, so there is no key to file this under. Refuse and
       // record it in the audit chain rather than inventing an intent.
@@ -273,7 +322,7 @@ export function createEngine(options: EngineOptions): Engine {
 
       if (proposed.disposition.kind === 'BLOCK') {
         if (proposed.disposition.reason === 'ALREADY_APPLIED') {
-          const refund = await findBySik(resolved, sik);
+          const refund = resolved.startsWith('pay_') ? await findBySik(resolved, sik) : null;
           return alreadyApplied(out, proposed.disposition.rail_entity_id, refund);
         }
         return blocked(out, proposed.disposition.reason, 'this intent is already closed');
@@ -312,7 +361,7 @@ export function createEngine(options: EngineOptions): Engine {
               audit_kind: 'GATES_PASSED',
             });
 
-      return issue(authorized, out);
+      return issue(authorized, out, name);
     },
   };
 }

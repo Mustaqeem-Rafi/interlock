@@ -7,7 +7,13 @@ import {
   RailError,
   RailResponseMismatchError,
 } from '../rail/errors.js';
-import type { Rail, Refund, RefundRequest, RefundSpeed } from '../rail/rail.js';
+import type {
+  InstantSettlement,
+  Rail,
+  Refund,
+  RefundRequest,
+  RefundSpeed,
+} from '../rail/rail.js';
 import { assertMayIssueRailCall, nextState } from './machine.js';
 
 /**
@@ -100,6 +106,11 @@ export function assertResponseIsOurs(refund: Refund, sik: string): void {
 
 export type IssueOutcome =
   | { readonly kind: 'APPLIED'; readonly refund: Refund; readonly intent: IntentRow }
+  | {
+      readonly kind: 'APPLIED_SETTLEMENT';
+      readonly settlement: InstantSettlement;
+      readonly intent: IntentRow;
+    }
   | { readonly kind: 'FAILED_TERMINAL'; readonly error: RailError; readonly intent: IntentRow }
   | { readonly kind: 'UNKNOWN'; readonly error: unknown; readonly intent: IntentRow };
 
@@ -119,6 +130,12 @@ export interface Wal {
    * AUTHORIZED is what makes a second caller lose.
    */
   issueRefund(intent: IntentRow, order?: RefundOrder): Promise<IssueOutcome>;
+  /**
+   * The same durable sequencing for a settlement. Kept separate rather than
+   * generalised because the two differ in the one place that matters: a refund
+   * can be found again by its stamp and a settlement cannot.
+   */
+  issueSettlement(intent: IntentRow, order?: RefundOrder): Promise<IssueOutcome>;
   /** IN_FLIGHT rows whose lease has lapsed, for the recovery sweep. */
   expiredLeases(limit?: number): readonly IntentRow[];
 }
@@ -257,6 +274,85 @@ export function createWal(options: WalOptions): Wal {
           },
         });
 
+        if (event === 'RAIL_REJECTED') {
+          return { kind: 'FAILED_TERMINAL', error: error as RailError, intent: moved };
+        }
+        return { kind: 'UNKNOWN', error, intent: moved };
+      }
+    },
+
+    async issueSettlement(intent, order = {}) {
+      assertMayIssueRailCall(intent.state);
+
+      // A settlement draws on the merchant balance, so there is no payment to
+      // stamp against and — on this rail — no field on the returned entity that
+      // could carry our sik. That is a real limitation, not an oversight: it
+      // means an ambiguous settlement cannot be reconciled by stamp the way a
+      // refund can, and the engine must hand it to a human instead of guessing.
+      // Everything else is identical, including the durable IN_FLIGHT row.
+      const request = { amount_minor: intent.amount_minor, notes: { ...order.notes } };
+
+      const started = store.intents.startAttempt({
+        merchant_id: intent.merchant_id,
+        sik: intent.sik,
+        from: 'AUTHORIZED',
+        at: now(),
+        request,
+        lease_owner: owner,
+        lease_ms: leaseMs,
+      });
+      const attemptSeq = started.attempt.attempt_seq;
+
+      try {
+        const settlement = await rail.createInstantSettlement(request);
+
+        store.intents.finishAttempt({
+          merchant_id: intent.merchant_id,
+          sik: intent.sik,
+          attempt_seq: attemptSeq,
+          at: now(),
+          outcome: 'APPLIED',
+          rail_entity_id: settlement.id,
+          http_status: 200,
+          fee_minor: settlement.fee_minor,
+          tax_minor: settlement.tax_minor,
+          response: settlement,
+        });
+
+        const applied = store.intents.transition({
+          merchant_id: intent.merchant_id,
+          sik: intent.sik,
+          from: 'IN_FLIGHT',
+          to: nextState('IN_FLIGHT', 'RAIL_APPLIED'),
+          at: now(),
+          rail_entity_id: settlement.id,
+          lease: null,
+          audit_kind: 'RAIL_APPLIED',
+          audit_payload: { attempt_seq: attemptSeq, rail_entity_id: settlement.id },
+        });
+
+        return { kind: 'APPLIED_SETTLEMENT', settlement, intent: applied };
+      } catch (error) {
+        const { event, attempt } = outcomeFor(error);
+        store.intents.finishAttempt({
+          merchant_id: intent.merchant_id,
+          sik: intent.sik,
+          attempt_seq: attemptSeq,
+          at: now(),
+          outcome: attempt,
+          http_status: error instanceof RailError ? error.status : null,
+          error_code: error instanceof RailError ? error.code : 'UNEXPECTED',
+        });
+        const moved = store.intents.transition({
+          merchant_id: intent.merchant_id,
+          sik: intent.sik,
+          from: 'IN_FLIGHT',
+          to: nextState('IN_FLIGHT', event),
+          at: now(),
+          lease: null,
+          audit_kind: event,
+          audit_payload: { attempt_seq: attemptSeq, ambiguous: event === 'RAIL_AMBIGUOUS' },
+        });
         if (event === 'RAIL_REJECTED') {
           return { kind: 'FAILED_TERMINAL', error: error as RailError, intent: moved };
         }

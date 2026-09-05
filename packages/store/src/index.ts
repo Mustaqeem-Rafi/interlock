@@ -56,6 +56,7 @@ export type {
   IntentRow,
   StartAttemptInput,
   TransitionInput,
+  WindowTotals,
 } from './intents.js';
 
 export { createDecisionRepository } from './decisions.js';

@@ -23,6 +23,7 @@
     "@interlock/core": "workspace:*",
     "@interlock/store": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "yaml": "^2.9.0",
     "zod": "^4.1.5"
   },
   "devDependencies": {
