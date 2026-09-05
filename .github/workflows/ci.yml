@@ -87,10 +87,11 @@ jobs:
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/consumer"
+          expected="$(node -p "require('./node_modules/interlock-mcp/package.json').version")"
           for bin in interlock-mcp interlock-init; do
             printed="$(./node_modules/.bin/$bin --version)"
-            if [ "$printed" != "0.1.0" ]; then
-              echo "$bin --version printed '$printed', expected '0.1.0'" >&2
+            if [ "$printed" != "$expected" ]; then
+              echo "$bin --version printed '$printed', expected '$expected'" >&2
               echo "A silent exit 0 means the entry guard did not fire." >&2
               exit 1
             fi

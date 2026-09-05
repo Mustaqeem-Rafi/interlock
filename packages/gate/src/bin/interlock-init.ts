@@ -23,7 +23,7 @@ import { MOCK_MANIFEST } from '../proxy/manifest.js';
  * unless the answer at the prompt is exactly "yes".
  */
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 
 const NL = String.fromCharCode(10);
 

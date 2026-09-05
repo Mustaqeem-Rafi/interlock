@@ -1,6 +1,6 @@
 {
   "name": "@interlock/bench",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Scenario runner and the naive (ungated) comparison harness.",
   "type": "module",

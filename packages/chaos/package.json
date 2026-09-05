@@ -1,6 +1,6 @@
 {
   "name": "@interlock/chaos",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Fault-injecting rail and the kill-point matrix runner.",
   "type": "module",

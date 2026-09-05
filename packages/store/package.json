@@ -1,6 +1,6 @@
 {
   "name": "@interlock/store",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "SQLite-backed intent and audit ledger (better-sqlite3, synchronous by design).",
   "type": "module",

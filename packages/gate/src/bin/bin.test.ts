@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -22,6 +22,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..', '..', '..', '..');
 const BIN = join(REPO, 'packages', 'gate', 'dist', 'bin', 'interlock-mcp.js');
 const MANDATE = join(REPO, 'examples', 'mandate.yaml');
+/** Read, not hardcoded: a literal here rots silently on the next release. */
+const VERSION = (
+  JSON.parse(readFileSync(join(REPO, 'packages', 'gate', 'package.json'), 'utf8')) as {
+    version: string;
+  }
+).version;
 
 /**
  * Can a child process here open a real ledger?
@@ -187,7 +193,7 @@ describe('interlock-mcp: invoked the way npm installs it', () => {
       encoding: 'utf8',
       stdio: 'pipe',
     }).trim();
-    expect(printed).toBe('0.1.0');
+    expect(printed).toBe(VERSION);
     rmSync(link, { force: true });
   });
 
@@ -197,6 +203,6 @@ describe('interlock-mcp: invoked the way npm installs it', () => {
       encoding: 'utf8',
       stdio: 'pipe',
     }).trim();
-    expect(printed).toBe('0.1.0');
+    expect(printed).toBe(VERSION);
   });
 });
