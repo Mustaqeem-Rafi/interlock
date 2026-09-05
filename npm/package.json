@@ -28,8 +28,8 @@
     "node": ">=22.13.0"
   },
   "bin": {
-    "interlock-mcp": "./dist/interlock-mcp.js",
-    "interlock-init": "./dist/interlock-init.js"
+    "interlock-mcp": "dist/interlock-mcp.js",
+    "interlock-init": "dist/interlock-init.js"
   },
   "files": [
     "dist",
