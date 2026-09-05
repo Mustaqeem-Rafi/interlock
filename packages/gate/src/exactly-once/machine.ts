@@ -44,7 +44,38 @@ export type MachineEvent =
   | 'RETRY_AUTHORIZED'
   /** A fresh proposal arrived for an intent that finished without applying. */
   | 'REOPENED'
-  | 'QUARANTINE';
+  | 'QUARANTINE'
+  /**
+   * A human went and looked, and is recording what they found.
+   *
+   * QUARANTINED had no way out, which made it a leak rather than a safe stop:
+   * the intent sat forever and its idempotency key stayed poisoned, so even a
+   * legitimate repeat of that refund could never be made again. Reconciliation
+   * had already failed by the time an intent got here, so the only thing that
+   * can resolve it is someone reading the rail's own dashboard.
+   *
+   * These are deliberately not spellings of the automatic events. An operator
+   * asserting an outcome and the reconciler proving one are different claims
+   * with different trust, and the audit log has to be able to tell them apart
+   * a year later.
+   */
+  | 'OPERATOR_CONFIRMED_APPLIED'
+  | 'OPERATOR_CONFIRMED_NOT_APPLIED';
+
+/**
+ * The events a person causes, as opposed to ones the engine raises itself.
+ *
+ * QUARANTINED is reachable only when reconciliation could not decide, so the
+ * rule that matters there is not "nothing leaves" but "nothing leaves on its
+ * own". Naming the two sets makes that testable instead of a comment, and
+ * makes it obvious in the audit log which kind of claim moved an intent.
+ */
+export const OPERATOR_EVENTS: readonly MachineEvent[] = [
+  'HOLD_RELEASED',
+  'HOLD_REJECTED',
+  'OPERATOR_CONFIRMED_APPLIED',
+  'OPERATOR_CONFIRMED_NOT_APPLIED',
+];
 
 export const MACHINE_EVENTS: readonly MachineEvent[] = [
   'GATES_PASSED',
@@ -64,6 +95,8 @@ export const MACHINE_EVENTS: readonly MachineEvent[] = [
   'RETRY_AUTHORIZED',
   'REOPENED',
   'QUARANTINE',
+  'OPERATOR_CONFIRMED_APPLIED',
+  'OPERATOR_CONFIRMED_NOT_APPLIED',
 ];
 
 export class IllegalTransitionError extends InvariantViolation {
@@ -223,8 +256,21 @@ export function nextState(from: IntentState, event: MachineEvent): IntentState {
       }
 
     case 'QUARANTINED':
-      // A human is the correct answer at this scale. Nothing automatic leaves.
-      return illegal(from, event, 'QUARANTINED requires a human, not an event');
+      switch (event) {
+        // A human read the rail and found our entity. Recording it here is
+        // what lets the ledger agree with the money again.
+        case 'OPERATOR_CONFIRMED_APPLIED':
+          return 'APPLIED';
+        // A human read the rail and our entity is not there. This lands in
+        // CONFIRMED_NOT_APPLIED rather than AUTHORIZED so it re-enters through
+        // the one retry edge the guarantee names, and is not a second way in.
+        case 'OPERATOR_CONFIRMED_NOT_APPLIED':
+          return 'CONFIRMED_NOT_APPLIED';
+        default:
+          // Still true of everything automatic: nothing the engine does on its
+          // own may leave this state.
+          return illegal(from, event, 'QUARANTINED requires a human, not an event');
+      }
 
     default:
       return assertNever(from);

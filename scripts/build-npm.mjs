@@ -25,7 +25,7 @@ const REPO = resolve(HERE, '..');
 const OUT = join(REPO, 'npm');
 const DIST = join(OUT, 'dist');
 
-const BINARIES = ['interlock-mcp', 'interlock-init'];
+const BINARIES = ['interlock-mcp', 'interlock-init', 'interlock-console'];
 
 rmSync(DIST, { recursive: true, force: true });
 mkdirSync(join(OUT, 'examples'), { recursive: true });

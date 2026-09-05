@@ -32,6 +32,7 @@
   },
   "bin": {
     "interlock-mcp": "./dist/bin/interlock-mcp.js",
-    "interlock-init": "./dist/bin/interlock-init.js"
+    "interlock-init": "./dist/bin/interlock-init.js",
+    "interlock-console": "./dist/bin/interlock-console.js"
   }
 }

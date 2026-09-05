@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   IllegalTransitionError,
   MACHINE_EVENTS,
+  OPERATOR_EVENTS,
   allEdges,
   assertMayIssueRailCall,
   canTransition,
@@ -94,6 +95,8 @@ describe('the transition table', () => {
         'HELD --HOLD_REJECTED--> BLOCKED',
         'HELD --HOLD_RELEASED--> AUTHORIZED',
         'HELD --QUARANTINE--> QUARANTINED',
+        'QUARANTINED --OPERATOR_CONFIRMED_APPLIED--> APPLIED',
+        'QUARANTINED --OPERATOR_CONFIRMED_NOT_APPLIED--> CONFIRMED_NOT_APPLIED',
         'IN_FLIGHT --LEASE_EXPIRED--> UNKNOWN',
         'IN_FLIGHT --RAIL_AMBIGUOUS--> UNKNOWN',
         'IN_FLIGHT --RAIL_APPLIED--> APPLIED',
@@ -129,9 +132,24 @@ describe('the transition table', () => {
   });
 
   it('lets nothing out of QUARANTINED without a human', () => {
+    // The rule is not "nothing leaves" — it is "nothing leaves on its own".
+    // An intent is here precisely because reconciliation could not decide, so
+    // the only thing that can resolve it is someone reading the rail.
     for (const event of MACHINE_EVENTS) {
+      if (OPERATOR_EVENTS.includes(event)) continue;
       expect(canTransition('QUARANTINED', event)).toBe(false);
     }
+  });
+
+  it('lets a human record what they found, and nothing more', () => {
+    expect(nextState('QUARANTINED', 'OPERATOR_CONFIRMED_APPLIED')).toBe('APPLIED');
+    // Not AUTHORIZED. An operator saying it did not happen must re-enter
+    // through the one retry edge the guarantee names, not become a second one.
+    expect(nextState('QUARANTINED', 'OPERATOR_CONFIRMED_NOT_APPLIED')).toBe(
+      'CONFIRMED_NOT_APPLIED',
+    );
+    // A hold resolution is not a quarantine resolution.
+    expect(canTransition('QUARANTINED', 'HOLD_RELEASED')).toBe(false);
   });
 
   it('reaches every state except PROPOSED from somewhere', () => {

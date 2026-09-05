@@ -21,6 +21,15 @@ export interface DecisionRepository {
   record(merchantId: string, decision: Decision): DecisionRow;
   find(requestId: string): DecisionRow | undefined;
   forIntent(merchantId: string, sik: string): DecisionRow[];
+  /**
+   * Newest first, for the operator console.
+   *
+   * `before` is the decided_at of the last row already shown, so paging is a
+   * keyset walk rather than an OFFSET: the console polls, decisions keep
+   * arriving, and OFFSET would silently repeat or skip rows as the table grows
+   * underneath it.
+   */
+  recent(options?: { verdict?: string; limit?: number; before?: number }): DecisionRow[];
 }
 
 export function createDecisionRepository(db: Db): DecisionRepository {
@@ -33,6 +42,12 @@ export function createDecisionRepository(db: Db): DecisionRepository {
   const selectForIntent = db.prepare(
     `SELECT ${DECISION_COLUMNS} FROM decisions
      WHERE merchant_id = ? AND sik = ? ORDER BY decided_at ASC`,
+  );
+
+  const selectRecent = db.prepare(
+    `SELECT ${DECISION_COLUMNS} FROM decisions
+     WHERE decided_at < @before AND (@verdict IS NULL OR verdict = @verdict)
+     ORDER BY decided_at DESC, request_id DESC LIMIT @limit`,
   );
 
   return {
@@ -76,6 +91,14 @@ export function createDecisionRepository(db: Db): DecisionRepository {
 
     forIntent(merchantId, sik) {
       return selectForIntent.all(merchantId, sik) as DecisionRow[];
+    },
+
+    recent(options = {}) {
+      return selectRecent.all({
+        verdict: options.verdict ?? null,
+        limit: Math.min(Math.max(options.limit ?? 50, 1), 500),
+        before: options.before ?? Number.MAX_SAFE_INTEGER,
+      }) as DecisionRow[];
     },
   };
 }

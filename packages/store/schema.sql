@@ -135,6 +135,11 @@ CREATE TABLE IF NOT EXISTS decisions (
 
 CREATE INDEX IF NOT EXISTS decisions_intent ON decisions (merchant_id, sik);
 
+-- The console reads decisions newest-first and pages by decided_at. Without
+-- this the read is a full scan of a WITHOUT ROWID table keyed by request_id,
+-- which has no useful order at all.
+CREATE INDEX IF NOT EXISTS decisions_recent ON decisions (decided_at DESC);
+
 -- ---------------------------------------------------------------------------
 -- recon_findings
 --

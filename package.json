@@ -22,7 +22,8 @@
     "build:npm": "pnpm run build && node scripts/build-npm.mjs",
     "publish:npm": "pnpm run build:npm && npm publish ./npm --access public",
     "interlock": "node packages/gate/dist/bin/interlock-mcp.js",
-    "mandate:init": "pnpm run build && node packages/gate/dist/bin/interlock-init.js"
+    "mandate:init": "pnpm run build && node packages/gate/dist/bin/interlock-init.js",
+    "console": "node packages/gate/dist/bin/interlock-console.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",

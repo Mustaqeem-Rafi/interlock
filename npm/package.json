@@ -29,7 +29,8 @@
   },
   "bin": {
     "interlock-mcp": "dist/interlock-mcp.js",
-    "interlock-init": "dist/interlock-init.js"
+    "interlock-init": "dist/interlock-init.js",
+    "interlock-console": "dist/interlock-console.js"
   },
   "files": [
     "dist",
