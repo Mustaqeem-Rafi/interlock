@@ -105,4 +105,4 @@ ledger compared against the rail journal.
 
 Run it with `pnpm chaos:matrix --trials 4`.
 
-Started 2026-09-05T17:58:23.324Z, took 84s.
+Started 2026-09-05T18:04:25.038Z, took 74s.
