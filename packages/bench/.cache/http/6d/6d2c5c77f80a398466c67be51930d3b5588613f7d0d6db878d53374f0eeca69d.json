@@ -1,0 +1,8 @@
+{
+  "key": "6d2c5c77f80a398466c67be51930d3b5588613f7d0d6db878d53374f0eeca69d",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrs22bN4nBuIgv2i1MUGcDj8NVKl\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642346,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": null,\n        \"tool_calls\": [\n          {\n            \"id\": \"call_ESm7BpZihuLfFd0eOK8fYrz0\",\n            \"type\": \"function\",\n            \"function\": {\n              \"name\": \"fetch_order\",\n              \"arguments\": \"{\\\"order_id\\\":\\\"evening-orders\\\"}\"\n            }\n          }\n        ],\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"tool_calls\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 887,\n    \"completion_tokens\": 17,\n    \"total_tokens\": 904,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000013000
+}

@@ -1,0 +1,8 @@
+{
+  "key": "b33167229105b2f7ec34f2e66252ca5233a6ab622d7da5677d6621ad433c19fa",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrtUJ2O3xNu7jeIG59nKkYGQO0ZZ\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642436,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": null,\n        \"tool_calls\": [\n          {\n            \"id\": \"call_P9JSi87Y4esqc1OJH8w2Yoin\",\n            \"type\": \"function\",\n            \"function\": {\n              \"name\": \"create_instant_settlement\",\n              \"arguments\": \"{\\\"amount\\\":2000000}\"\n            }\n          }\n        ],\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"tool_calls\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 313,\n    \"completion_tokens\": 19,\n    \"total_tokens\": 332,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000000000
+}

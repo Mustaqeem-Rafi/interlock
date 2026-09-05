@@ -1,0 +1,8 @@
+{
+  "key": "7e4df4b07c46cfe66699bc39895bce5c6a4c89c42552fe571bb03eac7eb814ea",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrsJAsQZlICPERSlVr2enoy70BgA\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642363,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The remaining amount of 139,900 paise has been successfully refunded for order_MOCK0000000001 (pay_MOCK0000000001). A total of 50,000 paise was previously refunded as goodwill credit.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 619,\n    \"completion_tokens\": 48,\n    \"total_tokens\": 667,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000002000
+}

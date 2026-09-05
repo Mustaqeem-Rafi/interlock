@@ -1,0 +1,8 @@
+{
+  "key": "849470638df4c05d6836ef50f7e3499979e87e5d13eb7ceba36179a5562c555a",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKru1InfZkvcyWmLXvWBIR40GESpE\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642469,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": null,\n        \"tool_calls\": [\n          {\n            \"id\": \"call_bw9dKLnuy4JUI4g2r1YKEoOE\",\n            \"type\": \"function\",\n            \"function\": {\n              \"name\": \"create_refund\",\n              \"arguments\": \"{\\\"payment_id\\\":\\\"pay_MOCK0000000001\\\",\\\"amount\\\":189900}\"\n            }\n          }\n        ],\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"tool_calls\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 315,\n    \"completion_tokens\": 27,\n    \"total_tokens\": 342,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000000000
+}

@@ -1,0 +1,8 @@
+{
+  "key": "7c7fd5c6b5983c7daf91005578abac7678c6d28932945628a4ac8fcbb027867c",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrtbJFeE4jW27Nw7ZUSO3EVSlcFz\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642443,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"I have settled Rs 20,000 (INR 2,000,000 minor units) to the current account to ensure payroll is processed. Next, I'll monitor the balance and proceed with additional settlements as the orders settle this afternoon and again before closing time.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 1127,\n    \"completion_tokens\": 54,\n    \"total_tokens\": 1181,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 1024,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000009000
+}

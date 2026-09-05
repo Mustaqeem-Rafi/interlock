@@ -1,0 +1,8 @@
+{
+  "key": "95813642be0c510138aff5ed6f073353d91317f5f4695be9e9df022bcea906b7",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrsmSnwi61r8lSXGLOX40jJkluiQ\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642392,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The refund for order order_MOCK0000000001 was attempted but was refused because the requested amount of 48,000 INR exceeds the maximum limit of 5,000 INR set by the payment mandate. To proceed with the refund, the mandate needs to be adjusted by a person before the refund can be processed.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 962,\n    \"completion_tokens\": 65,\n    \"total_tokens\": 1027,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000003000
+}

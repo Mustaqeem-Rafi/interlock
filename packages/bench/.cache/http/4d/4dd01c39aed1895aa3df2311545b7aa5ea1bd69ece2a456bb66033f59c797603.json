@@ -1,0 +1,8 @@
+{
+  "key": "4dd01c39aed1895aa3df2311545b7aa5ea1bd69ece2a456bb66033f59c797603",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrqzdvMQNElJv4app3VbipGlX0uC\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642281,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": null,\n        \"tool_calls\": [\n          {\n            \"id\": \"call_hIq7cax6BeZkOSW0QeEP5mAB\",\n            \"type\": \"function\",\n            \"function\": {\n              \"name\": \"create_refund\",\n              \"arguments\": \"{\\\"payment_id\\\":\\\"pay_MOCK0000000001\\\",\\\"amount\\\":489900,\\\"interlock_distinct_reason\\\":\\\"Refund for return of item as it has been received back in acceptable condition.\\\"}\"\n            }\n          }\n        ],\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"tool_calls\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 608,\n    \"completion_tokens\": 49,\n    \"total_tokens\": 657,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000002000
+}

@@ -1,0 +1,8 @@
+{
+  "key": "bc536aabfd806e99d1a22cd7d8e7ab664bed529f042af0a72d53f7850c5ccfd0",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrtNmicTo9IiKOet5WuIzUpDHcbG\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642429,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"Refunds of Rs 2,000 have been successfully issued for each of the two desk lamps returned (one without an interlock reason and one with RMA-8902 as the reason). The refund entities are rfnd_MOCK0000000001 and rfnd_MOCK0000000002.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 1554,\n    \"completion_tokens\": 62,\n    \"total_tokens\": 1616,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000002000
+}

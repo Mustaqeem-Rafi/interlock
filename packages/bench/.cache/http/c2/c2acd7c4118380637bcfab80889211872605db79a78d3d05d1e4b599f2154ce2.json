@@ -1,0 +1,8 @@
+{
+  "key": "c2acd7c4118380637bcfab80889211872605db79a78d3d05d1e4b599f2154ce2",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrtpPcasNmRoXP7hhxFgOpsY70is\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642457,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The settlement request for Rs 20,000 has been refused due to exceeding the allowed limit for the specified time. The block reason is related to the total amount exceeded within the last 24 hours. \\n\\nPlease check the current mandate settings or adjust the amount accordingly to make the settlement.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 643,\n    \"completion_tokens\": 58,\n    \"total_tokens\": 701,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000001000
+}

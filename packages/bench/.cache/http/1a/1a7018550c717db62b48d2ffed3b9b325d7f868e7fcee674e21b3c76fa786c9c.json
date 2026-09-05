@@ -1,0 +1,8 @@
+{
+  "key": "1a7018550c717db62b48d2ffed3b9b325d7f868e7fcee674e21b3c76fa786c9c",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrr3aHEaFAJbtWBQpRgL4r1MP9TF\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642285,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": null,\n        \"tool_calls\": [\n          {\n            \"id\": \"call_d9DVOSFaRxJiWKBLkh8Sip6K\",\n            \"type\": \"function\",\n            \"function\": {\n              \"name\": \"create_refund\",\n              \"arguments\": \"{\\\"payment_id\\\":\\\"pay_MOCK0000000001\\\",\\\"amount\\\":189900,\\\"interlock_distinct_reason\\\":\\\"Item arrived damaged and returned.\\\"}\"\n            }\n          }\n        ],\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"tool_calls\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 364,\n    \"completion_tokens\": 40,\n    \"total_tokens\": 404,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000001000
+}

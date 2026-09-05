@@ -1,0 +1,8 @@
+{
+  "key": "543ab06fb3e30ab26b1b694393fb3d4e3db0b276919f73a0a7b7c9dbb8852a3f",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrsafvrz3YbcanLVTNEvEcCmIRIP\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642380,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": null,\n        \"tool_calls\": [\n          {\n            \"id\": \"call_Qy5o28VGAgnq6JtV6U0s0LPs\",\n            \"type\": \"function\",\n            \"function\": {\n              \"name\": \"create_refund\",\n              \"arguments\": \"{\\\"payment_id\\\":\\\"pay_MOCK0000000001\\\",\\\"amount\\\":500000,\\\"interlock_distinct_reason\\\":\\\"Damaged handset refund approved by Trust & Safety desk.\\\"}\"\n            }\n          }\n        ],\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"tool_calls\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 936,\n    \"completion_tokens\": 45,\n    \"total_tokens\": 981,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000003000
+}

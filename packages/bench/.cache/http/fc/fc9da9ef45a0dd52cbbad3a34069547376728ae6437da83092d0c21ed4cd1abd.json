@@ -1,0 +1,8 @@
+{
+  "key": "fc9da9ef45a0dd52cbbad3a34069547376728ae6437da83092d0c21ed4cd1abd",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrsb0aOdP0fDwpzcWvwRgdGipj9K\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642381,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The refund for the damaged handset request cannot be processed as it exceeds the allowable limit set by the payment mandate. The maximum amount that can be refunded is ₹1,899, but a higher amount was attempted.\\n\\nPlease address the mandate permissions with your finance team before proceeding with the refund.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 1264,\n    \"completion_tokens\": 58,\n    \"total_tokens\": 1322,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000004000
+}

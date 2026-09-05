@@ -1,0 +1,8 @@
+{
+  "key": "9051449cfefd7e7d759c93e94814e0effe607a47606978c4361997b1a895cb2f",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrrpoNcNiVgKEMaH82KSc9uF2dZs\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642333,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"Both Rs 2,000 refunds have been successfully processed against the payment for order order_MOCK0000000001. The first refund was issued normally, while the second included the distinct reason of RMA-8902.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 724,\n    \"completion_tokens\": 46,\n    \"total_tokens\": 770,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_3aad0add9c\"\n}\n",
+  "recorded_at": 1757000002000
+}

@@ -1,0 +1,8 @@
+{
+  "key": "cd069073f50a75391be5005b5042a8ff450f2693182ae42d9eaca230c5ddcdc4",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrtVZYEGkQKmWMw0CZyYymgiXGUh\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642437,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": null,\n        \"tool_calls\": [\n          {\n            \"id\": \"call_HhLIjGHD8ZLtneO7g9dWyz96\",\n            \"type\": \"function\",\n            \"function\": {\n              \"name\": \"fetch_payment\",\n              \"arguments\": \"{\\\"payment_id\\\":\\\"setlod_MOCK0000000001\\\"}\"\n            }\n          }\n        ],\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"tool_calls\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 783,\n    \"completion_tokens\": 22,\n    \"total_tokens\": 805,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000001000
+}

@@ -1,0 +1,8 @@
+{
+  "key": "1d9e3db0f8bd9d6a01abafe8b5b8ebfe5734719a75ec144c5a1602046a9f7c0a",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrrxUh6XhIAtjeDFA0Yv72pzLo10\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642341,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": null,\n        \"tool_calls\": [\n          {\n            \"id\": \"call_V384lg4wK4bVlOlqMPbjc0B1\",\n            \"type\": \"function\",\n            \"function\": {\n              \"name\": \"fetch_order\",\n              \"arguments\": \"{\\\"order_id\\\":\\\"settle-afternoon\\\"}\"\n            }\n          }\n        ],\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"tool_calls\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 627,\n    \"completion_tokens\": 18,\n    \"total_tokens\": 645,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_3aad0add9c\"\n}\n",
+  "recorded_at": 1757000006000
+}

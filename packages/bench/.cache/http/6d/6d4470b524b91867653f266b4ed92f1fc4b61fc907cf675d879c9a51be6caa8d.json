@@ -1,0 +1,8 @@
+{
+  "key": "6d4470b524b91867653f266b4ed92f1fc4b61fc907cf675d879c9a51be6caa8d",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrsO0b8uo8MKifzJ6igDntRPO4B9\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642368,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"An instant settlement of 1,500,000 paise (15,000 INR) has been processed. The fees amounted to 3,750 paise (37.50 INR) and the tax was 675 paise (6.75 INR). The total amount settled was 1,495,575 paise (14,955.75 INR).\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 443,\n    \"completion_tokens\": 74,\n    \"total_tokens\": 517,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_f367f9dc44\"\n}\n",
+  "recorded_at": 1757000001000
+}

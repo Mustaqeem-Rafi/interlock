@@ -1,0 +1,8 @@
+{
+  "key": "75d2fe97af1ca2db53d76746187d67a8ca2fca38e5c76e489540c67fedb6a742",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKruHarW2DnGsdkywAYn7HqbFUlPs\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642485,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"For payment ID `pay_MOCK0000000001`, there have been two refunds processed:\\n\\n1. Refund ID `rfnd_MOCK0000000001`: ₹500.00\\n2. Refund ID `rfnd_MOCK0000000002`: ₹250.00\\n\\nTotal refunded: ₹750.00 (or 75,000 minor units).\\n\\nThe original captured amount for this payment was ₹1,899.00 (or 189,900 minor units).\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 588,\n    \"completion_tokens\": 97,\n    \"total_tokens\": 685,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000002000
+}

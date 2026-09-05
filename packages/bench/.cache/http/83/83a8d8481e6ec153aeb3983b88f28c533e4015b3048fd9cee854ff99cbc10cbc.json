@@ -1,0 +1,8 @@
+{
+  "key": "83a8d8481e6ec153aeb3983b88f28c533e4015b3048fd9cee854ff99cbc10cbc",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrr75C0RNZcMSkITIWOAFImj4uTR\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642289,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The refund of Rs 1,899 has been successfully processed against the payment for the damaged item on order order_MOCK0000000001. The ticket #41240 is now closed.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 881,\n    \"completion_tokens\": 39,\n    \"total_tokens\": 920,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000004000
+}

@@ -1,0 +1,8 @@
+{
+  "key": "9034fe332a075398db858ea0994d0fa3a531e0ea82b0a538d7cfe39d9dce28d8",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrtt7WA5jFTyT0c4Z2Edt4AfBZ7L\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642461,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"I have processed the refunds for ticket 44812 against payment ID pay_MOCK0000000001. Here are the refund IDs:\\n\\n1. Rs 500 for the nine-day delivery delay - **rfnd_MOCK0000000001**\\n2. Rs 650 for the crushed outer box - **rfnd_MOCK0000000002**\\n3. Rs 400 for the courier redelivery charge - **rfnd_MOCK0000000003**\\n4. Rs 800 as an apology credit - **rfnd_MOCK0000000004** \\n\\nYou can now paste these IDs into the ticket.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 2649,\n    \"completion_tokens\": 124,\n    \"total_tokens\": 2773,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000004000
+}

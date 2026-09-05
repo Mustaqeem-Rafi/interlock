@@ -1,0 +1,8 @@
+{
+  "key": "1360e4882496f56d1931e6a5d301ae2571388b7913c73ad326e927100fb23334",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrtEn1cQrrU3IkLeg93nDI2v4yZv\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642420,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"A refund of Rs 1,899 has been successfully processed for the payment ID `pay_MOCK0000000001` due to the customer canceling within the hour and the order never being picked. The refund ID is `rfnd_MOCK0000000001`.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 819,\n    \"completion_tokens\": 56,\n    \"total_tokens\": 875,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000001000
+}

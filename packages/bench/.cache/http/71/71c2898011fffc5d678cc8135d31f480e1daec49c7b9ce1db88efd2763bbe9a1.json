@@ -1,0 +1,8 @@
+{
+  "key": "71c2898011fffc5d678cc8135d31f480e1daec49c7b9ce1db88efd2763bbe9a1",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrsH7OaNKUpbXFoor8B6bXIcsDs9\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642361,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"A partial refund of 50,000 paise has been successfully processed for payment ID pay_MOCK0000000001. You can now close the ticket.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 614,\n    \"completion_tokens\": 33,\n    \"total_tokens\": 647,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000003000
+}

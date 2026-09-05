@@ -1,0 +1,8 @@
+{
+  "key": "456c9c6abb97c9906cf79cb73cac8e3b72beb97fc1df322d44d3e87e29cbc65e",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrsv3DO9NJsH0s8tbt0ttz9bcC2f\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642401,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The refund of Rs 1,899 on payment ID pay_MOCK0000000001 was already applied previously and has the refund ID rfnd_MOCK0000000001. You can provide this ID to finance.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 1017,\n    \"completion_tokens\": 45,\n    \"total_tokens\": 1062,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000002000
+}

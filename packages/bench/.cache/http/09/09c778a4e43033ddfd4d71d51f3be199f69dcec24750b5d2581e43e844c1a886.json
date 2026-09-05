@@ -1,0 +1,8 @@
+{
+  "key": "09c778a4e43033ddfd4d71d51f3be199f69dcec24750b5d2581e43e844c1a886",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrrMn0C3i01qL7EyFcGrNXjpNBuD\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642304,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"A refund of Rs 1,899 has been processed for payment ID pay_MOCK0000000001 due to a duplicate charge. The refund ID is rfnd_MOCK0000000001.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 545,\n    \"completion_tokens\": 41,\n    \"total_tokens\": 586,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000002000
+}

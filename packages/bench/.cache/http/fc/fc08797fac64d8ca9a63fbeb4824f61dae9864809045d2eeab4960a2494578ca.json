@@ -1,0 +1,8 @@
+{
+  "key": "fc08797fac64d8ca9a63fbeb4824f61dae9864809045d2eeab4960a2494578ca",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKruJt4HgSgn2eK9DubdqpVDsx2TT\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642487,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The instant settlement of 1,500,000 paise was successfully processed. Here are the details:\\n\\n- **Fee:** 3,750 paise\\n- **Tax:** 675 paise\\n- **Net Amount Settled:** 1,495,575 paise\\n\\nYou can book these amounts against this month's expenses.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 766,\n    \"completion_tokens\": 68,\n    \"total_tokens\": 834,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000001000
+}

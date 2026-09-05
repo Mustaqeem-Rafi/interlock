@@ -1,0 +1,8 @@
+{
+  "key": "d1fb05039dcaa11cb5a07a37a23d513aaf009b74fcc5c494555e5afe53ab3963",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrt8eHHbStkBASpfrE5hUUMLGUsD\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642414,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"A refund of Rs 1,899 has been successfully processed against payment ID pay_MOCK0000000001, due to the item arriving damaged. The refund ID is rfnd_MOCK0000000001.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 807,\n    \"completion_tokens\": 44,\n    \"total_tokens\": 851,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_3aad0add9c\"\n}\n",
+  "recorded_at": 1757000001000
+}

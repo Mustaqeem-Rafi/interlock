@@ -1,0 +1,8 @@
+{
+  "key": "d14e0a67abc72a2e83ca8b586eb9d67035f1492a5e897dd80e98247babbe5c20",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrtum2iwg4OYCEJhWUANwWNecMxv\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642462,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": null,\n        \"tool_calls\": [\n          {\n            \"id\": \"call_JR4ys8LtPdmWcsJhYTo5PAfi\",\n            \"type\": \"function\",\n            \"function\": {\n              \"name\": \"fetch_order\",\n              \"arguments\": \"{\\\"order_id\\\": \\\"order_MOCK0000000001\\\"}\"\n            }\n          },\n          {\n            \"id\": \"call_BiqWsTl63rTem3OaPh8PYeaR\",\n            \"type\": \"function\",\n            \"function\": {\n              \"name\": \"fetch_payment\",\n              \"arguments\": \"{\\\"payment_id\\\": \\\"pay_MOCK0000000001\\\"}\"\n            }\n          }\n        ],\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"tool_calls\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 300,\n    \"completion_tokens\": 58,\n    \"total_tokens\": 358,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000000000
+}

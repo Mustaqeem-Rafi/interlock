@@ -1,0 +1,8 @@
+{
+  "key": "a348be2eade4d1816203358d21980a9f64ce107a6762881fde63dbfbb5c229e9",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrs168YSqud7XPhhUK8oiJdxY4ys\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642345,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": null,\n        \"tool_calls\": [\n          {\n            \"id\": \"call_rJ0rAf1YFwXsMPJoaCusdfvD\",\n            \"type\": \"function\",\n            \"function\": {\n              \"name\": \"fetch_order\",\n              \"arguments\": \"{\\\"order_id\\\":\\\"end-of-day\\\"}\"\n            }\n          }\n        ],\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"tool_calls\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 851,\n    \"completion_tokens\": 17,\n    \"total_tokens\": 868,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_3aad0add9c\"\n}\n",
+  "recorded_at": 1757000012000
+}

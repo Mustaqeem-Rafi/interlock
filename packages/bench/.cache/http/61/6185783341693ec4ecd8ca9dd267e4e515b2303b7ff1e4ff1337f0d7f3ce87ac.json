@@ -1,0 +1,8 @@
+{
+  "key": "6185783341693ec4ecd8ca9dd267e4e515b2303b7ff1e4ff1337f0d7f3ce87ac",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrtLPbjs3VvuZa8jQVP0uyVxuXq2\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642427,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The refund request of Rs 1,899 for the payment ID pay_MOCK0000000001 has been held for review and requires manual approval due to reconciliation issues. You will need to have someone review and release it.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 643,\n    \"completion_tokens\": 46,\n    \"total_tokens\": 689,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000001000
+}

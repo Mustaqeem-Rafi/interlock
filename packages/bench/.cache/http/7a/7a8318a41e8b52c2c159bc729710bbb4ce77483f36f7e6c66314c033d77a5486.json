@@ -1,0 +1,8 @@
+{
+  "key": "7a8318a41e8b52c2c159bc729710bbb4ce77483f36f7e6c66314c033d77a5486",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrrncXJHYby8L1lekjNrsuDL0bBx\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642331,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The refund of Rs 1,899 has been attempted, but there was a timeout, and it may or may not have been applied. \\n\\nUpon checking, the payment has already been fully refunded. Therefore, no further action is necessary regarding the refund for this order.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 596,\n    \"completion_tokens\": 55,\n    \"total_tokens\": 651,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_8c012bb801\"\n}\n",
+  "recorded_at": 1757000004000
+}

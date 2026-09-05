@@ -1,0 +1,8 @@
+{
+  "key": "bb952ba931c7d850fb86cb02281c3dbe2c71d45f259c106991cac250be911cb5",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrsXGKVjpbSfFVOePJlxvf2x2CDz\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642377,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The order indicates that the item was returned and inspected, and a total of ₹4,899 (or 489900 paise) was deemed refundable, which includes the item price plus shipping and handling fees. However, the payment limit for refunds is set to ₹1,899 (or 189900 paise), which is why the refund request was blocked.\\n\\nTo proceed, the payment mandate must be altered by a person to allow for a higher refund amount. Please escalate this issue as necessary to address the refund discrepancy.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 907,\n    \"completion_tokens\": 106,\n    \"total_tokens\": 1013,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_3aad0add9c\"\n}\n",
+  "recorded_at": 1757000003000
+}

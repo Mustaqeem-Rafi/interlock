@@ -1,0 +1,8 @@
+{
+  "key": "4795a9344a17dc54cb4a99cac171417ba393ea5bdb57c3d2ae44dcd8c49f4f06",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrs97Zs8yFlKmmgjpTfNFMKHFjAn\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642353,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The customer has been refunded in full for the dead-on-arrival handset (Rs 1,899) against the payment reference. The ticket has been successfully closed.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 884,\n    \"completion_tokens\": 34,\n    \"total_tokens\": 918,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_3aad0add9c\"\n}\n",
+  "recorded_at": 1757000004000
+}

@@ -1,0 +1,8 @@
+{
+  "key": "c31d1b6a5775bc1af1ca149c1dc65680c8afab1d1f5a1c980109db6240b3687e",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "status": 200,
+  "content_type": "application/json",
+  "body": "{\n  \"id\": \"chatcmpl-EKrtSACm9BTPyGDJwzcw1CbXzaYhM\",\n  \"object\": \"chat.completion\",\n  \"created\": 1788642434,\n  \"model\": \"gpt-4o-mini-2024-07-18\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The payment for the desk lamp (Rs 1,899) has already been fully refunded, with no additional amount available for refund. Therefore, a refund cannot be issued again.\\n\\nYou can inform the customer that the refund was processed but that it may take additional time to reflect in her account.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 950,\n    \"completion_tokens\": 60,\n    \"total_tokens\": 1010,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_3aad0add9c\"\n}\n",
+  "recorded_at": 1757000004000
+}
