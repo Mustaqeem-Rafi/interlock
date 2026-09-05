@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { InvariantViolation } from '@interlock/core';
 import { openStore, type Store } from '@interlock/store';
 import { createConsoleApp } from '../api/server.js';
-import { ledgerReadiness } from '../api/views.js';
+import { ledgerReadiness } from '../api/readiness.js';
 import { loadMandate } from './interlock-mcp.js';
 
 /**
@@ -111,7 +111,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     // process does not run. See ledgerReadiness.
     readiness: () => ledgerReadiness(store, Date.now()),
     token,
-    merchantId: mandate.merchant_id,
+    mandate,
   });
 
   await new Promise<void>((ready) => app.listen(port, host, ready));

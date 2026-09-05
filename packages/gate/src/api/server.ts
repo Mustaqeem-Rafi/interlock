@@ -1,13 +1,14 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import type { IntentState } from '@interlock/core';
 import type { Store } from '@interlock/store';
 
 import { createAuthoriser, type Authoriser } from './auth.js';
-import { applyOperatorAction, OperatorActionError, type Operation } from './operations.js';
+import { OperatorActionError } from './operations.js';
+import type { Mandate } from '@interlock/core';
+import type { ConsoleContext } from './console-api.js';
+import { handleRead as consoleRead, handleWrite as consoleWrite } from './routes.js';
 import { streamAuditLog } from './stream.js';
-import { listDecisions, listIntents, summarise, NEEDS_A_HUMAN } from './views.js';
 
 /**
  * The operator console's HTTP surface. Node's own http, no framework.
@@ -29,7 +30,9 @@ export interface ConsoleOptions {
    */
   readonly readiness: () => { ready: boolean; phase: string; outstanding: number; status: number };
   readonly token: string;
-  readonly merchantId: string;
+  /** Read for merchant, agent, granted tools and expiry. */
+  readonly mandate: Mandate;
+  readonly railKind?: string;
   readonly now?: () => number;
 }
 
@@ -42,20 +45,6 @@ export interface ConsoleOptions {
  * that is right in one layout and silently wrong in the other, try both and
  * fail loudly if neither is there.
  */
-function findConsoleHtml(): string | undefined {
-  for (const candidate of ['../../console.html', '../console.html']) {
-    const path = fileURLToPath(new URL(candidate, import.meta.url));
-    if (existsSync(path)) return path;
-  }
-  return undefined;
-}
-
-const OPERATIONS: Readonly<Record<string, Operation>> = {
-  approve: 'approve',
-  deny: 'deny',
-  'confirm-applied': 'confirm-applied',
-  'confirm-not-applied': 'confirm-not-applied',
-};
 
 function send(res: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body, null, 2);
@@ -93,75 +82,28 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   }
 }
 
-const str = (value: unknown): string => (typeof value === 'string' ? value : '');
+/** Injected into the served page so it addresses the gate that served it. */
+const GATE_ORIGIN_SCRIPT = '<script>window.INTERLOCK_GATE_URL = location.origin;</script>';
 
-function handleRead(
-  path: string,
-  url: URL,
-  options: ConsoleOptions,
-  now: number,
-  res: ServerResponse,
-): boolean {
-  if (path === '/api/summary') {
-    send(res, 200, summarise(options.store, options.merchantId, now));
-    return true;
+function findConsoleHtml(): string | undefined {
+  for (const candidate of ['../../console.html', '../console.html']) {
+    const path = fileURLToPath(new URL(candidate, import.meta.url));
+    if (existsSync(path)) return path;
   }
-  if (path === '/api/intents') {
-    const states = url.searchParams.getAll('state') as IntentState[];
-    send(res, 200, {
-      intents: listIntents(options.store, {
-        ...(states.length > 0 ? { states } : {}),
-        limit: Number(url.searchParams.get('limit') ?? 100),
-      }),
-    });
-    return true;
-  }
-  // The two queues Block 12 names. Same data as /api/intents?state=, given the
-  // names the console is written against so a route rename cannot silently
-  // empty a queue that a person is supposed to be working through.
-  if (path === '/api/held') {
-    send(res, 200, { intents: listIntents(options.store, { states: ['HELD'], limit: 200 }) });
-    return true;
-  }
-  if (path === '/api/quarantine') {
-    send(res, 200, { intents: listIntents(options.store, { states: ['QUARANTINED'], limit: 200 }) });
-    return true;
-  }
-  if (path === '/api/attention') {
-    // One call for the only screen that matters during an incident.
-    send(res, 200, { intents: listIntents(options.store, { states: NEEDS_A_HUMAN, limit: 200 }) });
-    return true;
-  }
-  if (path === '/api/decisions') {
-    const verdict = url.searchParams.get('verdict');
-    const before = url.searchParams.get('before');
-    send(res, 200, {
-      decisions: listDecisions(options.store, {
-        ...(verdict === null ? {} : { verdict }),
-        ...(before === null ? {} : { before: Number(before) }),
-        limit: Number(url.searchParams.get('limit') ?? 50),
-      }),
-    });
-    return true;
-  }
-  if (path === '/api/audit') {
-    const from = Number(url.searchParams.get('from') ?? 0);
-    const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 100), 1), 500);
-    send(res, 200, {
-      records: options.store.audit.read(from, limit),
-      count: options.store.audit.count(),
-      // Cheap to ask, and the only honest way to present an audit log: say
-      // whether the chain still verifies rather than implying it.
-      first_broken_seq: options.store.audit.verifyChain(),
-    });
-    return true;
-  }
-  return false;
+  return undefined;
 }
 
 export function createConsoleApp(options: ConsoleOptions): Server {
   const authorised: Authoriser = createAuthoriser(options.token);
   const now = options.now ?? Date.now;
+  const startedAt = now();
+  const ctx: ConsoleContext = {
+    store: options.store,
+    mandate: options.mandate,
+    railKind: options.railKind ?? 'mock',
+    startedAt,
+    now,
+  };
 
   return createServer((req, res) => {
     void (async () => {
@@ -176,13 +118,20 @@ export function createConsoleApp(options: ConsoleOptions): Server {
          * predecessor must not be sent traffic — it would decide against a
          * ledger that is still incomplete.
          */
-        if (path === '/health') {
+        // Both spellings are unauthenticated: /health for load balancers, and
+        // /api/health because the console treats 503 as a state it renders
+        // rather than an error, and must be able to read it before unlocking.
+        if (path === '/health' || path === '/api/health') {
           const readiness = options.readiness();
-          send(res, readiness.status, {
-            status: readiness.ready ? 'ready' : 'recovering',
-            phase: readiness.phase,
-            outstanding: readiness.outstanding,
-          });
+          const body =
+            path === '/api/health'
+              ? consoleRead(ctx, path, url.searchParams, readiness)?.body
+              : {
+                  status: readiness.ready ? 'ready' : 'recovering',
+                  phase: readiness.phase,
+                  outstanding: readiness.outstanding,
+                };
+          send(res, readiness.status, body);
           return;
         }
 
@@ -192,7 +141,21 @@ export function createConsoleApp(options: ConsoleOptions): Server {
             send(res, 500, { error: { code: 'NO_CONSOLE', message: 'console.html is missing' } });
             return;
           }
-          const body = readFileSync(html);
+          /**
+           * Point the page at the gate that served it.
+           *
+           * Without this the console reads no gate URL, falls back to its
+           * seeded demo, and shows convincing fixtures on a real deployment —
+           * the worst possible failure for a surface whose entire job is to
+           * tell an operator what actually happened.
+           */
+          const body = Buffer.from(
+            readFileSync(html, 'utf8').replace(
+              '<head>',
+              ['<head>', GATE_ORIGIN_SCRIPT].join(String.fromCharCode(10)),
+            ),
+            'utf8',
+          );
           res.writeHead(200, {
             'content-type': 'text/html; charset=utf-8',
             'content-length': body.length,
@@ -239,29 +202,22 @@ export function createConsoleApp(options: ConsoleOptions): Server {
           return;
         }
 
-        if (req.method === 'GET' && handleRead(path, url, options, now(), res)) return;
+        const readiness = options.readiness();
 
-        const action = /^\/api\/intents\/([A-Z2-7]{1,64})\/(.+)$/.exec(path);
-        if (req.method === 'POST' && action) {
-          const [, sik, verb] = action;
-          const operation = OPERATIONS[verb ?? ''];
-          if (operation === undefined) {
-            send(res, 404, { error: { code: 'NO_SUCH_OPERATION', message: `unknown: ${verb}` } });
+        if (req.method === 'GET') {
+          const result = consoleRead(ctx, path, url.searchParams, readiness);
+          if (result !== undefined) {
+            send(res, result.status, result.body);
             return;
           }
-          const body = await readJson(req);
-          const result = applyOperatorAction(options.store, {
-            merchant_id: options.merchantId,
-            sik: sik ?? '',
-            operation,
-            reason: str(body['reason']),
-            operator: str(body['operator']) || 'console',
-            rail_entity_id:
-              typeof body['rail_entity_id'] === 'string' ? body['rail_entity_id'] : undefined,
-            at: now(),
-          });
-          send(res, 200, result);
-          return;
+        }
+
+        if (req.method === 'POST') {
+          const result = consoleWrite(options.store, ctx, path, await readJson(req), now());
+          if (result !== undefined) {
+            send(res, result.status, result.body);
+            return;
+          }
         }
 
         send(res, 404, { error: { code: 'NOT_FOUND', message: `no route for ${path}` } });

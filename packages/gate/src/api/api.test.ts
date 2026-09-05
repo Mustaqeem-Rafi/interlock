@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { openStore, type Store } from '@interlock/store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createConsoleApp } from './server.js';
-import { ledgerReadiness } from './views.js';
+import { ledgerReadiness } from './readiness.js';
 
 /**
  * The console exists to close two holes in the state machine.
@@ -37,6 +37,16 @@ interface Health {
 
 const READY: Health = { ready: true, phase: 'ready', outstanding: 0, status: 200 };
 
+/** Minimal, but a real Mandate: the console reads merchant, agent and grants. */
+const TEST_MANDATE = {
+  mandate_id: 'mnd_test',
+  merchant_id: 'acc_TEST00000001',
+  agent_id: 'agent_test',
+  expires_at: 4_102_444_800_000,
+  scope: { grants: { create_refund: { reversibility: 'irreversible' } } },
+  provenance: { manifest_sha256: 'c'.repeat(64), pinned_manifest: [] },
+} as unknown as Parameters<typeof createConsoleApp>[0]['mandate'];
+
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'interlock-api-'));
   const store = openStore(join(dir, 'ledger.db'));
@@ -45,7 +55,7 @@ beforeEach(async () => {
     store,
     readiness: () => state.readiness,
     token: TOKEN,
-    merchantId: 'acc_TEST00000001',
+    mandate: TEST_MANDATE,
     now: () => 1_700_000_000_000,
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -204,12 +214,13 @@ describe('console: the door', () => {
 describe('console: a HELD intent can leave HELD', () => {
   it('approve moves it to AUTHORIZED and records who and why', async () => {
     const sik = seedIntent('HELD');
-    const res = await post(`/api/intents/${sik}/approve`, {
-      reason: 'confirmed with the customer on ticket 4471',
-      operator: 'priya',
+    const res = await post(`/api/held/${sik}/approve`, {
+      approver: 'priya',
+      note: 'confirmed with the customer on ticket 4471',
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ from: 'HELD', to: 'AUTHORIZED' });
+    expect(await res.json()).toMatchObject({ status: 'approved', resolved_by: 'priya' });
+    expect(harness.store.intents.require('acc_TEST00000001', sik).state).toBe('AUTHORIZED');
 
     const audit = harness.store.audit.read(0, 100);
     const entry = audit.find((r) => r.kind === 'OPERATOR_APPROVE');
@@ -223,7 +234,7 @@ describe('console: a HELD intent can leave HELD', () => {
 
   it('approving grants authority without moving money', async () => {
     const sik = seedIntent('HELD');
-    await post(`/api/intents/${sik}/approve`, { reason: 'ok' });
+    await post(`/api/held/${sik}/approve`, { approver: 'priya', note: 'ok' });
     const row = harness.store.intents.require('acc_TEST00000001', sik);
     // Not APPLIED, and no rail entity: the agent's next request spends this.
     // A mis-click in a console must never be the thing that pays someone.
@@ -233,19 +244,22 @@ describe('console: a HELD intent can leave HELD', () => {
 
   it('deny moves it to BLOCKED, which is absorbing', async () => {
     const sik = seedIntent('HELD');
-    expect((await post(`/api/intents/${sik}/deny`, { reason: 'not a real return' })).status).toBe(
-      200,
-    );
+    expect(
+      (await post(`/api/held/${sik}/deny`, { approver: 'priya', note: 'not a real return' }))
+        .status,
+    ).toBe(200);
     expect(harness.store.intents.require('acc_TEST00000001', sik).state).toBe('BLOCKED');
-    const again = await post(`/api/intents/${sik}/approve`, { reason: 'changed my mind' });
+    const again = await post(`/api/held/${sik}/approve`, { approver: 'priya' });
     expect(again.status).toBe(409);
   });
 
-  it('refuses a state change with no stated reason', async () => {
+  it('refuses a state change that nobody signed', async () => {
     const sik = seedIntent('HELD');
-    const res = await post(`/api/intents/${sik}/approve`, { reason: '   ' });
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('REASON_REQUIRED');
+    const res = await post(`/api/held/${sik}/approve`, { note: 'no approver given' });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
+      'VALIDATION_FAILED',
+    );
     expect(harness.store.intents.require('acc_TEST00000001', sik).state).toBe('HELD');
   });
 });
@@ -253,10 +267,13 @@ describe('console: a HELD intent can leave HELD', () => {
 describe('console: a QUARANTINED intent can be resolved by a human', () => {
   it('confirm-applied requires the rail entity the operator found', async () => {
     const sik = seedIntent('QUARANTINED');
-    const missing = await post(`/api/intents/${sik}/confirm-applied`, { reason: 'saw it' });
-    expect(missing.status).toBe(400);
+    const missing = await post(`/api/quarantine/${sik}/resolve`, {
+      resolution: 'APPLIED',
+      approver: 'priya',
+    });
+    expect(missing.status).toBe(422);
     expect(((await missing.json()) as { error: { code: string } }).error.code).toBe(
-      'RAIL_ENTITY_REQUIRED',
+      'VALIDATION_FAILED',
     );
     // Still quarantined: a claim that money moved with nothing to point at is
     // worse than the quarantine it would replace.
@@ -265,9 +282,10 @@ describe('console: a QUARANTINED intent can be resolved by a human', () => {
 
   it('confirm-applied records the entity and lands in APPLIED', async () => {
     const sik = seedIntent('QUARANTINED');
-    const res = await post(`/api/intents/${sik}/confirm-applied`, {
-      reason: 'found in the dashboard',
-      rail_entity_id: 'rfnd_REAL0000000001',
+    const res = await post(`/api/quarantine/${sik}/resolve`, {
+      resolution: 'APPLIED',
+      approver: 'priya',
+      evidence_url: 'rfnd_REAL0000000001',
     });
     expect(res.status).toBe(200);
     const row = harness.store.intents.require('acc_TEST00000001', sik);
@@ -281,7 +299,12 @@ describe('console: a QUARANTINED intent can be resolved by a human', () => {
     // that edge rather than becoming a second way in.
     const sik = seedIntent('QUARANTINED');
     expect(
-      (await post(`/api/intents/${sik}/confirm-not-applied`, { reason: 'not on the rail' })).status,
+      (
+        await post(`/api/quarantine/${sik}/resolve`, {
+          resolution: 'CONFIRMED_NOT_APPLIED',
+          approver: 'priya',
+        })
+      ).status,
     ).toBe(200);
     expect(harness.store.intents.require('acc_TEST00000001', sik).state).toBe(
       'CONFIRMED_NOT_APPLIED',
@@ -290,7 +313,7 @@ describe('console: a QUARANTINED intent can be resolved by a human', () => {
 
   it('refuses an operation the machine does not allow from that state', async () => {
     const sik = seedIntent('PROPOSED');
-    const res = await post(`/api/intents/${sik}/approve`, { reason: 'nope' });
+    const res = await post(`/api/held/${sik}/approve`, { approver: 'priya' });
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: { message: string } }).error.message).toContain(
       'PROPOSED',
@@ -298,40 +321,63 @@ describe('console: a QUARANTINED intent can be resolved by a human', () => {
   });
 
   it('404s an intent that does not exist', async () => {
-    const res = await post('/api/intents/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/approve', {
-      reason: 'x',
+    const res = await post('/api/held/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/approve', {
+      approver: 'priya',
     });
     expect(res.status).toBe(404);
   });
 });
 
 describe('console: reads', () => {
-  it('summarises by state and separates what needs a human', async () => {
+  it('counts what is open, in the shape the console reads', async () => {
     seedIntent('HELD', 'HELDSIK'.padEnd(32, 'A'));
     seedIntent('QUARANTINED', 'QSIK'.padEnd(32, 'B'));
     const body = (await (await get('/api/summary')).json()) as {
-      counts: Record<string, number>;
-      needs_attention: number;
+      held_open: number;
+      quarantined_open: number;
+      orphans_detected: number;
     };
-    expect(body.counts['HELD']).toBe(1);
-    expect(body.counts['QUARANTINED']).toBe(1);
-    expect(body.needs_attention).toBe(2);
+    expect(body.held_open).toBe(1);
+    expect(body.quarantined_open).toBe(1);
+    // Zero because nothing scans for orphans at runtime, not because none
+    // exist. Those are different claims; this pins the honest one.
+    expect(body.orphans_detected).toBe(0);
   });
 
-  it('/api/attention returns exactly what a person has to act on', async () => {
+  it('/api/held returns only what is open by default', async () => {
     seedIntent('HELD', 'HELDSIK'.padEnd(32, 'A'));
     seedIntent('APPLIED', 'ASIK'.padEnd(32, 'C'));
-    const body = (await (await get('/api/attention')).json()) as { intents: { state: string }[] };
-    expect(body.intents.map((i) => i.state).sort()).toEqual(['HELD']);
+    const body = (await (await get('/api/held')).json()) as { items: { status: string }[] };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]?.status).toBe('open');
+  });
+
+  it('names the mandate and the tools it grants', async () => {
+    const body = (await (await get('/api/mandates')).json()) as {
+      items: { mandate_id: string; granted_tools: string[] }[];
+    };
+    expect(body.items[0]?.mandate_id).toBe('mnd_test');
+    expect(body.items[0]?.granted_tools).toContain('create_refund');
+  });
+
+  it('/api/health is a state, not an error, and needs no token', async () => {
+    harness.setReadiness({ ready: false, phase: 'reconciling', outstanding: 2, status: 503 });
+    const res = await get('/api/health', NO_TOKEN);
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { status: string; recovery: { complete: boolean } };
+    expect(body.status).toBe('recovering');
+    expect(body.recovery.complete).toBe(false);
   });
 
   it('reports whether the audit chain still verifies, rather than implying it', async () => {
     seedIntent('HELD');
-    const body = (await (await get('/api/audit')).json()) as {
-      count: number;
-      first_broken_seq: number | null;
+    const body = (await (await get('/api/audit/verify')).json()) as {
+      ok: boolean;
+      checked: number;
+      first_divergent_seq: number | null;
     };
-    expect(body.count).toBeGreaterThan(0);
-    expect(body.first_broken_seq).toBeNull();
+    expect(body.ok).toBe(true);
+    expect(body.checked).toBeGreaterThan(0);
+    expect(body.first_divergent_seq).toBeNull();
   });
 });

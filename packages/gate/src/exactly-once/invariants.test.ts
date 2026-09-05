@@ -309,6 +309,35 @@ describe('acceptance: a repeat proposal returns the original rail entity', () =>
     expect(rail.inspect.refundsForPayment(paymentId)).toHaveLength(1);
     expect(rail.inspect.callCount('createRefund')).toBe(1);
   });
+
+  it('writes the prevention down, because an uncounted save is not a save', async () => {
+    // This event is the product. Until it was recorded, absorbing a duplicate
+    // and never being asked for one looked identical from outside: the ledger
+    // held one refund and one decision either way, and nothing anywhere said a
+    // second had been asked for and stopped.
+    const first = propose(store, newIntent());
+    const outcome = await wal.issueRefund(authorize(first.intent));
+    assertKind(outcome, 'APPLIED');
+
+    propose(store, newIntent({ at: T0 + 500 }));
+
+    const absorbed = store.audit.read(0, 500).filter((r) => r.kind === 'DUPLICATE_ABSORBED');
+    expect(absorbed).toHaveLength(1);
+    const payload = absorbed[0]?.payload as {
+      reason: string;
+      rail_entity_id: string | null;
+      amount_minor: number;
+    };
+    expect(payload.reason).toBe('ALREADY_APPLIED');
+    // The entity the caller got instead of a second movement of money.
+    expect(payload.rail_entity_id).toBe(outcome.refund.id);
+    expect(payload.amount_minor).toBe(first.intent.amount_minor);
+  });
+
+  it('records nothing when there was no duplicate to absorb', () => {
+    propose(store, newIntent());
+    expect(store.audit.read(0, 500).filter((r) => r.kind === 'DUPLICATE_ABSORBED')).toHaveLength(0);
+  });
 });
 
 describe('the propose path', () => {

@@ -2,373 +2,2569 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Interlock — operator console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Interlock console</title>
+<meta name="description" content="Operator console for Interlock — the layer between an AI agent and a payment API.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  /* Tokens are fixed. This surface is read during an incident; it does not
-     follow the operating system into light mode halfway through one. */
-  :root{
-    --bg:#0c0e11; --surface:#14171c; --border:#262b33; --text:#e6e9ee;
-    --muted:#8b949e; --allow:#3fb950; --hold:#d29922; --block:#f85149;
-    --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
-    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
-       font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
-  /* Every number mono, every sentence sans. */
-  .mono,td.mono,.kpi b,.sik,.ts,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
-  header{display:flex;align-items:center;gap:16px;padding:14px 20px;
-         border-bottom:1px solid var(--border);background:var(--surface);
-         position:sticky;top:0;z-index:5}
-  header h1{font-size:14px;font-weight:600;margin:0;letter-spacing:.02em}
-  header .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-  header .dot.ok{background:var(--allow)} header .dot.bad{background:var(--hold)}
-  header .spacer{flex:1}
-  button{font-family:var(--sans);font-size:13px;color:var(--text);background:#1b1f26;
-         border:1px solid var(--border);border-radius:6px;padding:5px 11px;cursor:pointer}
-  button:hover{border-color:#3a424e}
-  button.allow{border-color:#1f6f34;color:#7ee292}
-  button.block{border-color:#7d2b28;color:#ff9a94}
-  main{padding:20px;max-width:1240px;margin:0 auto}
-  section{margin-bottom:26px}
-  h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
-     font-weight:600;margin:0 0 10px}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
-  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:13px 15px}
-  .kpi span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;
-            letter-spacing:.07em;margin-bottom:5px}
-  .kpi b{font-size:23px;font-weight:500;display:block}
-  .kpi.warn b{color:var(--hold)}
-  table{width:100%;border-collapse:collapse;background:var(--surface);
-        border:1px solid var(--border);border-radius:8px;overflow:hidden}
-  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;
-     color:var(--muted);font-weight:600;padding:9px 12px;border-bottom:1px solid var(--border)}
-  td{padding:9px 12px;border-bottom:1px solid #1c2027;vertical-align:middle}
-  tr:last-child td{border-bottom:none}
-  .badge{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:4px;
-         border:1px solid;letter-spacing:.03em}
-  .ALLOW{color:var(--allow);border-color:#1f6f34;background:#0f2a17}
-  .HOLD{color:var(--hold);border-color:#7a5a12;background:#2a2110}
-  .BLOCK{color:var(--block);border-color:#7d2b28;background:#2c1414}
-  .sik{color:var(--muted);font-size:12px}
-  .ts{color:var(--muted);font-size:12px}
-  .amt{font-weight:500}
-  .empty{padding:16px 14px;color:var(--muted);border:1px dashed var(--border);
-         border-radius:8px;background:#101317}
-  .empty.good{color:#7ee292;border-color:#1f6f34}
-  .banner{display:none;padding:11px 15px;border-radius:8px;margin-bottom:18px;
-          border:1px solid #7a5a12;background:#2a2110;color:#f0cf7a}
-  .banner.on{display:block}
-  #gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;
-        justify-content:center;z-index:20}
-  #gate .box{background:var(--surface);border:1px solid var(--border);border-radius:10px;
-             padding:22px;width:min(420px,92vw)}
-  #gate h2{margin-bottom:6px}
-  #gate p{color:var(--muted);margin:0 0 14px}
-  input{width:100%;font-family:var(--mono);font-size:13px;padding:9px 11px;
-        background:#0f1216;border:1px solid var(--border);border-radius:6px;color:var(--text)}
-  .err{color:var(--block);font-size:12px;margin-top:8px;min-height:16px}
-  .stream{max-height:340px;overflow:auto}
-  tr.form-row td{background:#0f1216}
-  .form{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:4px 0}
-  .form label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);
-              text-transform:uppercase;letter-spacing:.06em;flex:1;min-width:200px}
-  .form input{font-family:var(--sans);text-transform:none;letter-spacing:normal}
-  .form-actions{display:flex;gap:8px;align-items:center}
-  .err.inline{margin-top:0}
+/* ═══════════════════════ constitution ═══════════════════════ */
+:root{
+  --bg:#0c0e11; --surface:#14171c; --raised:#1b1f26; --border:#262b33;
+  --text:#e6e9ee; --muted:#8b94a3; --dim:#5d6675;
+  --allow:#3fb950; --hold:#d29922; --block:#f85149; --link:#58a6ff;
+  --allow-bg:rgba(63,185,80,.09);  --allow-bd:rgba(63,185,80,.32);
+  --hold-bg:rgba(210,153,34,.09);  --hold-bd:rgba(210,153,34,.34);
+  --block-bg:rgba(248,81,73,.09);  --block-bd:rgba(248,81,73,.34);
+  --hair:#1e232a;                    /* interior hairline, quieter than --border */
+  --r-ctl:6px; --r-card:8px; --r-panel:10px;
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --top:52px; --gut:28px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3,h4,p,figure{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus{outline:none}
+:focus-visible{outline:1px solid var(--link);outline-offset:2px;border-radius:3px}
+[hidden]{display:none!important}
+::selection{background:rgba(88,166,255,.22)}
+.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.dim{color:var(--dim)}.muted{color:var(--muted)}
+.v-allow{color:var(--allow)}.v-hold{color:var(--hold)}.v-block{color:var(--block)}
+
+/* the one structural label style: an instrument caption */
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.eyebrow .raw{text-transform:none;letter-spacing:.06em;color:var(--muted)}
+
+/* ═══════════════════════ shell ═══════════════════════ */
+.wrap{width:100%;max-width:1420px;margin:0 auto;padding:0 var(--gut)}
+.topbar{position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:1px solid var(--border)}
+.topbar-in{height:var(--top);display:flex;align-items:center;gap:16px}
+.mark{display:flex;align-items:center;gap:10px;min-width:0}
+.mark b{font-weight:600;letter-spacing:-.018em;font-size:15px}
+.mark .glyph{width:13px;height:13px;flex:none;color:var(--muted)}
+.mark span{color:var(--dim);font-size:12px;font-family:var(--mono);letter-spacing:.02em}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:0}
+.chip{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 12px;
+  font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap;border-left:1px solid var(--border)}
+.chip b{font-weight:400;color:var(--text)}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--dim);flex:none}
+.dot.live{background:var(--allow)}.dot.warn{background:var(--hold)}.dot.down{background:var(--block)}
+.dot.pulse{animation:pulse 2.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:26px;margin-left:12px;
+  border:1px solid var(--border);border-radius:var(--r-ctl);background:none;cursor:pointer;color:var(--muted)}
+.iconbtn:hover{background:var(--surface);color:var(--text)}
+.iconbtn svg{width:14px;height:14px}
+
+.tabsbar{position:sticky;top:var(--top);z-index:39;background:var(--bg);border-bottom:1px solid var(--border)}
+.tabs{display:flex;align-items:stretch;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{position:relative;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 0;margin-right:20px;
+  border:0;background:none;color:var(--dim);cursor:pointer;font-size:13px;white-space:nowrap}
+.tab:hover{color:var(--muted)}
+.tab[aria-current="page"]{color:var(--text)}
+.tab[aria-current="page"]::after{content:"";position:absolute;left:0;right:16px;bottom:-1px;height:1px;background:var(--text)}
+.tab .count{font-family:var(--mono);font-size:10.5px;color:var(--dim);border:1px solid var(--border);border-radius:3px;padding:0 4px;line-height:15px}
+.tab .count.hot{color:var(--hold);border-color:var(--hold-bd)}
+.tab .count.crit{color:var(--block);border-color:var(--block-bd)}
+
+main{padding:22px 0 74px}
+.screen-head{display:flex;align-items:flex-start;gap:20px;margin-bottom:18px;flex-wrap:wrap}
+.screen-head .hd{min-width:0;flex:1 1 420px}
+.screen-head h1{font-size:19px;font-weight:600;letter-spacing:-.018em}
+.screen-head h1+p{margin-top:7px}
+.screen-head p{color:var(--muted);font-size:13.5px;max-width:68ch;line-height:1.55}
+.section-label{margin-bottom:9px}
+
+/* banners */
+.banners{display:flex;flex-direction:column;gap:8px}
+.banner{display:flex;align-items:flex-start;gap:11px;padding:11px 14px;border:1px solid var(--border);border-radius:var(--r-card);
+  background:var(--surface);font-size:13px}
+.banner .dot{margin-top:6px}
+.banner.warn{border-color:var(--hold-bd);background:var(--hold-bg)}
+.banner.bad{border-color:var(--block-bd);background:var(--block-bg)}
+.banner .b-body{min-width:0;flex:1}
+.banner .b-body b{font-weight:500}
+.banner details{margin-top:5px}
+.banner summary{cursor:pointer;color:var(--muted);font-size:12px;width:max-content}
+.banner details p{margin-top:4px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* ═══════════════════════ the instrument (decisions hero) ═══════════════════════ */
+.instrument{border-bottom:1px solid var(--border);margin-bottom:0}
+.inst-main{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,1fr)}
+.inst-hero{padding:26px 30px 28px 0;border-right:1px solid var(--hair)}
+.hero-value{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:64px;line-height:1;font-weight:500;
+  letter-spacing:-.05em;margin:14px 0 0}
+.hero-claim{font-size:15.5px;margin-top:15px;letter-spacing:-.005em}
+.hero-sub{margin-top:9px;color:var(--dim);font-size:12px;font-family:var(--mono);letter-spacing:.02em}
+.hero-sub b{color:var(--muted);font-weight:400}
+.inst-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-content:start}
+.ig{padding:16px 18px;border-left:1px solid var(--hair);border-bottom:1px solid var(--hair);min-width:0}
+.ig:nth-child(3n+1){border-left:0;padding-left:24px}
+.ig:nth-child(n+4){border-bottom:0}
+.ig-v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:19px;letter-spacing:-.02em;margin-top:7px}
+.ig-s{font-size:11.5px;color:var(--dim);margin-top:3px}
+.mix{display:flex;gap:7px;align-items:baseline;font-family:var(--mono);font-size:19px;letter-spacing:-.02em}
+.mix .sep{color:var(--border);font-size:14px}
+/* consequence bar — verdict mix by count, the only chart in the product */
+.inst-bar{display:flex;align-items:center;gap:18px;padding:12px 0;border-top:1px solid var(--hair)}
+.bar{flex:1;display:flex;gap:2px;height:3px;min-width:120px}
+.bar i{display:block;height:100%}
+.bar .b-allow{background:var(--allow);opacity:.55}
+.bar .b-hold{background:var(--hold)}
+.bar .b-block{background:var(--block)}
+.bar-legend{display:flex;gap:14px;font-family:var(--mono);font-size:11px;color:var(--dim);white-space:nowrap}
+.bar-legend b{font-weight:400}
+
+/* ═══════════════════════ filters — one instrument group ═══════════════════════ */
+.filterbar{display:flex;align-items:stretch;flex-wrap:wrap;border-bottom:1px solid var(--hair)}
+.filterbar .seg{display:flex;margin-right:26px}
+.filterbar .seg button{position:relative;border:0;background:none;padding:0;margin-right:20px;height:36px;color:var(--dim);
+  cursor:pointer;font-size:12.5px}
+.filterbar .seg button:hover{color:var(--muted)}
+.filterbar .seg button[aria-pressed="true"]{color:var(--text)}
+.filterbar .seg button[aria-pressed="true"]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:currentColor}
+.filterbar .seg button[aria-pressed="true"][data-v="ALLOW"]{color:var(--allow)}
+.filterbar .seg button[aria-pressed="true"][data-v="HOLD"]{color:var(--hold)}
+.filterbar .seg button[aria-pressed="true"][data-v="BLOCK"]{color:var(--block)}
+.fdiv{display:none}
+.selwrap{position:relative;display:flex;align-items:center}
+.selwrap::after{content:"";position:absolute;right:16px;top:calc(50% - 4px);width:5px;height:5px;border-right:1px solid var(--dim);
+  border-bottom:1px solid var(--dim);transform:rotate(45deg);pointer-events:none}
+select.ctl{height:36px;background:none;border:0;padding:0 24px 0 0;margin-right:22px;font-family:var(--mono);font-size:11.5px;
+  color:var(--muted);appearance:none;cursor:pointer;max-width:180px}
+select.ctl:hover{color:var(--text)}
+select.ctl option{background:var(--surface);color:var(--text)}
+.filterbar .tail{margin-left:auto;display:flex;align-items:center;gap:14px;height:36px;font-family:var(--mono);font-size:11px;color:var(--dim)}
+input.ctl,textarea.ctl{height:34px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-ctl);padding:0 11px;font-size:13px}
+input.ctl::placeholder{color:var(--dim)}
+input.ctl:focus,select.ctl:focus,textarea.ctl:focus{border-color:var(--link)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:34px;padding:0 15px;border-radius:var(--r-ctl);
+  border:1px solid var(--border);background:none;color:var(--text);cursor:pointer;font-size:13px;transition:background .12s ease,border-color .12s ease}
+.btn:hover{background:var(--raised)}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn.primary{border-color:var(--allow-bd);color:var(--allow);background:var(--allow-bg)}
+.btn.primary:hover{background:rgba(63,185,80,.16)}
+.btn.danger{border-color:var(--block-bd);color:var(--block);background:var(--block-bg)}
+.btn.danger:hover{background:rgba(248,81,73,.16)}
+.btn.ghost{border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--text);background:var(--raised)}
+.btn.sm{height:29px;padding:0 11px;font-size:12.5px}
+.btn.wide{width:100%;justify-content:space-between}
+.next{display:flex;align-items:center;gap:14px;width:100%;padding:16px 0;border:0;border-top:1px solid var(--hair);
+  background:none;color:var(--link);font:inherit;font-size:15px;letter-spacing:-.01em;cursor:pointer;text-align:left}
+.next .k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.next .sik{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--dim)}
+.next:hover{color:var(--link);text-decoration:underline}
+.next:hover .sik{text-decoration:none}
+.linkbtn{border:0;background:none;color:var(--link);cursor:pointer;padding:0;font-size:12.5px}
+.linkbtn:hover{text-decoration:underline}
+
+/* ═══════════════════════ verdict tokens ═══════════════════════ */
+.vt{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em}
+.vt::before{content:"";width:5px;height:5px;flex:none}
+.vt.ALLOW{color:var(--dim)}
+.vt.ALLOW::before{background:var(--allow);opacity:.7;border-radius:50%}
+.vt.HOLD{color:var(--hold)}
+.vt.HOLD::before{background:var(--hold)}
+.vt.BLOCK{color:var(--block)}
+.vt.BLOCK::before{background:var(--block)}
+.verdict{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:3px;border:1px solid;
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em}
+.verdict.ALLOW{color:var(--allow);background:var(--allow-bg);border-color:var(--allow-bd)}
+.verdict.HOLD{color:var(--hold);background:var(--hold-bg);border-color:var(--hold-bd)}
+.verdict.BLOCK{color:var(--block);background:var(--block-bg);border-color:var(--block-bd)}
+.verdict.off{color:var(--dim);background:none;border-color:var(--border)}
+.verdict.lg{height:23px;font-size:11px;padding:0 9px}
+
+/* ═══════════════════════ decision feed ═══════════════════════ */
+.feed{border-top:0}
+.feed-head,.row{display:grid;grid-template-columns:70px 96px 168px 122px minmax(0,1fr) 118px 116px 54px;
+  column-gap:16px;row-gap:0;padding:0 4px 0 14px;align-items:baseline}
+.feed-head{height:30px;align-items:center;border-bottom:1px solid var(--hair)}
+.feed-head span{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.feed-head .r,.row .r{text-align:right}
+.feed-head button{border:0;background:none;color:inherit;cursor:pointer;font:inherit;letter-spacing:.14em;padding:0}
+.feed-head button:hover,.feed-head button[data-active="1"]{color:var(--muted)}
+.rows{max-height:min(52vh,600px);overflow-y:auto;overscroll-behavior:contain}
+.rows::-webkit-scrollbar{width:9px}
+.rows::-webkit-scrollbar-thumb{background:var(--border);border-radius:9px}
+.row{width:100%;text-align:left;font:inherit;color:inherit;background:none;cursor:pointer;
+  border:0;border-bottom:1px solid var(--hair);border-left:2px solid transparent;padding-top:11px;padding-bottom:11px;
+  transition:background .12s ease}
+.row:last-child{border-bottom:0}
+.row:hover{background:rgba(255,255,255,.022)}
+.row[aria-selected="true"]{background:var(--surface)}
+.row .r-time{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.row .r-tool{font-family:var(--mono);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .r-agent{font-size:12.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .r-sum{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .r-amt{font-family:var(--mono);font-size:12.5px;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.row .r-risk{font-family:var(--mono);font-size:12.5px;text-align:right;color:var(--dim);font-variant-numeric:tabular-nums}
+.row .r-lat{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:right}
+.row .r-meta,.row .r-note{display:none}
+/* allow rows stay quiet */
+.row.v-ALLOW .r-tool{color:var(--muted)}
+/* consequence rows carry weight */
+.row.tier2{border-left-width:2px;padding-top:13px;padding-bottom:14px}
+.row.tier2.v-HOLD{border-left-color:var(--hold)}
+.row.tier2.v-BLOCK{border-left-color:var(--block)}
+.row.tier2 .r-tool{font-size:13px;color:var(--text)}
+.row.tier2 .r-sum{white-space:normal;color:var(--text);font-size:13.5px;line-height:1.45}
+.row.tier2 .r-amt{font-size:14px;color:var(--text)}
+.row.tier2 .r-risk{font-size:14px}
+.row.tier2.v-BLOCK .r-risk{color:var(--block)}
+.row.tier2.v-HOLD .r-risk{color:var(--hold)}
+.row .r-note{grid-column:3/-1;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-top:7px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.row .r-note em{font-style:normal;font-family:var(--sans);font-size:12.5px;letter-spacing:0;text-transform:none;color:var(--muted)}
+.row.tier2 .r-note{display:flex}
+.row.enter{animation:rowin .38s cubic-bezier(.2,.7,.3,1)}
+@keyframes rowin{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.feed-foot{display:flex;align-items:center;gap:14px;padding:11px 4px 0 14px;border-top:1px solid var(--hair)}
+.feed-foot .n{font-family:var(--mono);font-size:11px;color:var(--dim);margin-left:auto}
+.live-pill{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.04em}
+
+/* ═══════════════════════ cards, empties ═══════════════════════ */
+.card{border:1px solid var(--border);border-radius:var(--r-card);background:var(--surface)}
+.cards{display:flex;flex-direction:column;gap:36px}
+.empty{border:1px solid var(--border);border-radius:var(--r-card);background:var(--surface);padding:46px 24px;text-align:center}
+.empty .rule{width:34px;height:1px;background:var(--allow);opacity:.6;margin:0 auto 18px}
+.empty .k{font-size:16px;letter-spacing:-.01em;margin-bottom:7px}
+.empty .s{font-size:13px;color:var(--muted);max-width:54ch;margin:0 auto;line-height:1.55}
+.skel{height:46px;border-bottom:1px solid var(--hair);position:relative;overflow:hidden}
+.skel::after{content:"";position:absolute;inset:0;background:var(--raised);animation:sk 1.3s ease-in-out infinite}
+@keyframes sk{0%,100%{opacity:.22}50%{opacity:.5}}
+
+/* ═══════════════════════ evidence ═══════════════════════ */
+.ev{border:0}
+.ev-head{display:flex;align-items:center;gap:9px;padding:0 0 7px;border-bottom:1px solid var(--hair)}
+.kv{display:grid;grid-template-columns:minmax(150px,250px) minmax(0,1fr)}
+.kv>div{padding:6px 0;border-bottom:1px solid var(--hair);min-width:0;font-family:var(--mono);font-size:11.5px;word-break:break-word}
+.kv>div.k{color:var(--dim)}
+.kv>div.v{color:var(--text)}
+.kv>div:nth-last-child(-n+2){border-bottom:0}
+.kv .fmt{color:var(--muted);margin-left:9px}
+.kv .nul{color:var(--dim)}
+.kv .nest{padding-left:14px;position:relative}
+.kv .nest::before{content:"";position:absolute;left:3px;top:0;bottom:0;width:1px;background:var(--hair)}
+/* generic money comparison — any *_minor field in the evidence becomes a measured bar */
+.mbars{padding:12px 12px 14px;border-bottom:1px solid var(--hair);display:flex;flex-direction:column;gap:9px}
+.mb{display:grid;grid-template-columns:minmax(120px,190px) minmax(60px,1fr) auto;gap:12px;align-items:center}
+.mb-k{font-family:var(--mono);font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mb-track{height:6px;border:1px solid var(--hair);border-radius:2px;position:relative;overflow:hidden}
+.mb-fill{position:absolute;left:0;top:0;bottom:0;background:var(--muted);opacity:.5;min-width:1px}
+.mb.hi .mb-fill{background:var(--block);opacity:.8}
+.mb.lo .mb-fill{background:var(--muted);opacity:.35}
+.mb-v{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;text-align:right}
+.mb.hi .mb-v{color:var(--block)}
+
+/* ═══════════════════════ the interlock path — the signature motif ═══════════════════════ */
+.ipath{display:flex;align-items:center;list-style:none;margin:0;padding:0;flex-wrap:wrap;gap:0}
+.ipath li{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--dim);white-space:nowrap}
+.ipath li::after{content:"";width:30px;height:1px;background:var(--hair);margin:0 12px}
+.ipath.tight li::after{width:16px;margin:0 9px}
+.ipath.tight li{letter-spacing:.11em}
+.ipath li:last-child::after{display:none}
+.ipath li i{width:6px;height:6px;border:1px solid var(--dim);border-radius:50%;flex:none}
+.ipath li.done{color:var(--muted)}
+.ipath li.done i{background:var(--muted);border-color:var(--muted)}
+.ipath li.stop i{width:8px;height:8px}
+.ipath li.stop.BLOCK{color:var(--block)}
+.ipath li.stop.BLOCK i{background:var(--block);border-color:var(--block)}
+.ipath li.stop.HOLD{color:var(--hold)}
+.ipath li.stop.HOLD i{background:var(--hold);border-color:var(--hold)}
+.ipath li.stop.ALLOW{color:var(--allow)}
+.ipath li.stop.ALLOW i{background:var(--allow);border-color:var(--allow)}
+.ipath li.never{color:var(--dim);opacity:.62}
+.ipath li.never i{background:none;border-style:dashed}
+.ipath li.never::after,.ipath li.stop::after{background:none;height:0;border-top:1px dashed var(--border)}
+.ipath li.stop.on::after{background:var(--hair);border-top:0;height:1px}
+
+/* ═══════════════════════ featured case ═══════════════════════ */
+.case{border-left:2px solid var(--block);background:none;margin:30px 0 6px;padding:0 0 0 14px;width:100%;
+  text-align:left;color:inherit;font:inherit;cursor:pointer;display:block}
+.case.h{border-left-color:var(--hold)}
+.case-top{display:flex;align-items:baseline;gap:14px;padding:0 0 16px;flex-wrap:wrap}
+.case-top .go{margin-left:auto;color:var(--link);font-size:12.5px;display:flex;align-items:center;gap:7px}
+.case:hover .go{text-decoration:underline}
+.case-main{display:grid;grid-template-columns:minmax(230px,.8fr) minmax(0,1.2fr);gap:0}
+.case-left{padding:0 30px 0 0;border-right:1px solid var(--hair)}
+.case-verdict{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase}
+.case-amt{font-family:var(--mono);font-size:50px;letter-spacing:-.05em;line-height:1;margin-top:10px}
+.case-what{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-top:14px;line-height:1.7}
+.case-right{padding:0 0 0 30px}
+.case-why{font-size:16.5px;line-height:1.45;letter-spacing:-.012em;max-width:44ch}
+.case-codes{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.case-cmp{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:end;margin-top:20px;padding-top:18px;
+  border-top:1px solid var(--hair)}
+.case-cmp .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);line-height:1.5}
+.case-cmp .v{font-family:var(--mono);font-size:21px;letter-spacing:-.03em;margin-top:7px}
+.case-cmp .hi .v{color:var(--block)}
+.case-cmp .op{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);padding-bottom:5px}
+.case-path{padding:18px 0 0;margin-top:22px;border-top:1px solid var(--hair);overflow-x:auto}
+
+/* layered reason: human sentence, then the machine record */
+.reason-h{font-size:14.5px;line-height:1.55;letter-spacing:-.005em}
+.reason-m{display:flex;gap:9px;align-items:baseline;margin-top:9px;flex-wrap:wrap;
+  font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+.raw-cap{margin-top:14px}
+
+/* ═══════════════════════ drawer — the case file ═══════════════════════ */
+.scrim{position:fixed;inset:0;background:rgba(4,6,8,.72);z-index:60;opacity:0;transition:opacity .2s ease}
+.scrim.on{opacity:1}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(680px,100%);z-index:61;background:var(--bg);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;transform:translateX(18px);opacity:0;
+  transition:transform .24s cubic-bezier(.2,.7,.3,1),opacity .18s ease}
+.drawer.on{transform:none;opacity:1}
+.dr-head{padding:18px 22px 20px;border-bottom:1px solid var(--border);position:relative}
+.dr-close{position:absolute;top:16px;right:18px}
+.dr-eyebrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dr-verdict{font-size:27px;font-weight:600;letter-spacing:-.03em;margin-top:14px}
+.dr-amount{font-family:var(--mono);font-size:38px;letter-spacing:-.04em;line-height:1.05;margin-top:4px}
+.dr-consequence{margin-top:10px;font-size:13.5px;color:var(--muted);max-width:52ch;line-height:1.5}
+.dr-body{overflow-y:auto;flex:1;overscroll-behavior:contain}
+.dr-sect{padding:18px 22px;border-bottom:1px solid var(--border)}
+.dr-sect>h3{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-weight:400}
+.dr-sect>h3 .hint{font-family:var(--sans);font-size:12px;letter-spacing:0;text-transform:none;color:var(--dim);margin-left:auto}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.fact{padding:10px 0;border-bottom:1px solid var(--hair);min-width:0}
+.fact:nth-child(odd){padding-right:16px;border-right:1px solid var(--hair)}
+.fact:nth-child(even){padding-left:16px}
+.fact:nth-last-child(-n+2){border-bottom:0}
+.fact .k{font-size:11px;color:var(--dim);margin-bottom:4px}
+.fact .v{font-family:var(--mono);font-size:12.5px;word-break:break-all}
+.fact .v.big{font-size:16px;letter-spacing:-.015em}
+
+/* gate path */
+.gp{position:relative;padding-left:34px}
+.gp .gate{animation:gatein .26s cubic-bezier(.2,.7,.3,1) both}
+@keyframes gatein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.gp::before{content:"";position:absolute;left:9px;top:8px;bottom:14px;width:1px;background:var(--hair)}
+.gate{position:relative;margin-bottom:2px;border-radius:var(--r-ctl)}
+.gate::before{content:"";position:absolute;left:-30px;top:12px;width:9px;height:9px;border:1px solid var(--border);
+  background:var(--bg);border-radius:50%}
+.gate.evaluated::before{border-color:var(--muted)}
+.gate.decisive::before{border-color:var(--block);background:var(--block);width:11px;height:11px;left:-18.5px;top:13px}
+.gate.decisive.h::before{border-color:var(--hold);background:var(--hold)}
+.gate.model::before{border-style:dashed;border-color:var(--hold);left:-17.5px;top:13px}
+.gate-top{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;
+  padding:9px 12px 9px 0;border:0;background:none;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.gate-n{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.04em}
+.gate-name{font-size:13.5px;color:var(--muted);display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0}
+.gate.evaluated .gate-name{color:var(--text)}
+.gate.decisive .gate-name{font-size:14.5px;color:var(--text)}
+.gate.skipped .gate-name{color:var(--dim)}
+.gate-kind{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.gate.model .gate-kind{color:var(--hold)}
+.gate-right{display:flex;align-items:center;gap:10px}
+.gate-lat{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.gate-state{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.gate-body{padding:0 12px 14px 0;display:flex;flex-direction:column;gap:11px}
+.gate.decisive .gate-body{padding-left:0}
+.gate.decisive{background:var(--surface);border:1px solid var(--block-bd);margin:6px 0 8px -12px;padding:0 0 0 12px}
+.gate.decisive.h{border-color:var(--hold-bd)}
+.gate.model{border:1px dashed var(--hold-bd);margin:6px 0 8px -12px;padding:0 0 0 12px;background:rgba(210,153,34,.035)}
+.gate-desc{font-size:12.5px;color:var(--muted);max-width:62ch;line-height:1.55}
+.gate-reason{display:flex;gap:10px;align-items:baseline;font-size:13px}
+.code{display:inline-flex;align-items:center;height:19px;padding:0 6px;border:1px solid var(--border);border-radius:3px;
+  background:var(--bg);font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted);white-space:nowrap}
+.chev{width:10px;height:10px;color:var(--dim);transition:transform .18s ease}
+.gate[data-open="1"] .chev{transform:rotate(90deg)}
+
+/* the decisive comparison — figures on rules, not another box */
+.compare{border-top:1px solid var(--block-bd);border-bottom:1px solid var(--block-bd);padding:16px 0}
+.compare.h{border-color:var(--hold-bd)}
+.compare-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:end}
+.compare-cell .k{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.compare-cell .v{font-family:var(--mono);font-size:23px;letter-spacing:-.03em;margin-top:6px}
+.compare-cell.hi .v{color:var(--block)}
+.compare-op{font-family:var(--mono);font-size:15px;color:var(--dim)}
+.compare-note{margin-top:12px;font-size:12.5px;color:var(--muted);line-height:1.55;max-width:56ch}
+
+/* ═══════════════════════ timeline — forensic replay ═══════════════════════ */
+.path{display:flex;flex-wrap:wrap;align-items:center;gap:9px;padding:2px 0 22px;margin-bottom:4px}
+.path .p-state{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--muted)}
+.path .p-state.now{color:var(--text);border-bottom:1px solid currentColor;padding-bottom:1px}
+.path .p-state.warn{color:var(--hold)}.path .p-state.bad{color:var(--block)}.path .p-state.good{color:var(--allow)}
+.path .p-arrow{color:var(--border);font-family:var(--mono);font-size:11px}
+.path .p-loop{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.08em}
+.tl{position:relative;padding-left:26px}
+.tl::before{content:"";position:absolute;left:4px;top:8px;bottom:12px;width:1px;background:var(--hair)}
+.tlrow{position:relative;padding:0 0 20px}
+.tlrow::before{content:"";position:absolute;left:-26px;top:5px;width:9px;height:9px;background:var(--bg);
+  border:1px solid var(--dim);border-radius:50%}
+/* shape is semantics: circle = in motion, square = terminal, dashed = not known */
+.tlrow.terminal::before{border-radius:1px}
+.tlrow.unsure::before{border-style:dashed;background:var(--bg)}
+.tlrow.s-good::before{border-color:var(--allow)}
+.tlrow.s-warn::before{border-color:var(--hold)}
+.tlrow.s-bad::before{border-color:var(--block)}
+.tlrow.key::before{width:11px;height:11px;left:-27px;top:4px}
+.tlrow.key.s-warn::before{background:var(--hold-bg)}
+.tlrow.key.s-bad::before{background:var(--block);border-color:var(--block)}
+.tlrow.key.s-good::before{background:var(--allow);border-color:var(--allow)}
+.tl-top{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
+.tl-state{font-family:var(--mono);font-size:13px;letter-spacing:.02em}
+.tl-from{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.tl-at{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-left:auto}
+.tl-note{font-size:13px;color:var(--muted);margin-top:5px;max-width:72ch;line-height:1.55}
+.tlrow.key .tl-note{color:var(--text)}
+.tl-ev{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:6px}
+/* the interruption */
+.tl-break{position:relative;margin:2px 0 20px -26px;padding:0 0 0 0}
+.tl-break .rule{display:flex;align-items:center;gap:12px}
+.tl-break .rule::before,.tl-break .rule::after{content:"";height:1px;background:var(--block);opacity:.5;flex:1}
+.tl-break .rule::before{max-width:26px}
+.tl-break b{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--block);font-weight:400;white-space:nowrap}
+.tl-break span{display:block;font-size:12.5px;color:var(--muted);margin:8px 0 0 38px;max-width:60ch}
+.tl-fold{position:relative;margin:0 0 20px;padding:10px 14px;border:1px dashed var(--border);border-radius:var(--r-ctl);
+  display:flex;gap:14px;align-items:center;background:none;color:var(--muted);font-size:12.5px;cursor:pointer;width:100%;text-align:left}
+.tl-fold:hover{background:var(--surface);border-color:var(--muted)}
+.tl-fold b{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:400}
+.tl-fold .go{margin-left:auto;color:var(--link);font-size:12.5px}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0;border-top:1px solid var(--hair);margin-top:26px}
+.legend div{padding:16px 26px 0 0}
+.legend .l-k{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;letter-spacing:.06em}
+.legend .l-k i{width:8px;height:8px;border:1px solid currentColor;border-radius:50%;flex:none}
+.legend .l-k i.sq{border-radius:1px;background:currentColor}
+.legend .l-k i.da{border-style:dashed}
+.legend .l-s{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.55;max-width:34ch}
+
+.attempts{display:grid;grid-template-columns:44px 92px 92px minmax(110px,1fr) 56px minmax(0,1fr);
+  border-top:1px solid var(--hair);font-family:var(--mono);font-size:11.5px}
+.attempts>div{padding:8px 14px 8px 0;border-bottom:1px solid var(--hair);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.attempts>div.h{color:var(--dim);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+
+/* ═══════════════════════ held — the human control surface ═══════════════════════ */
+article[data-held],article[data-quar]{border:0;border-left:2px solid var(--hold);border-radius:0;background:none;padding:0 0 0 22px}
+article[data-quar]{border-left-color:var(--block)}
+article[data-held].done{border-left-color:var(--border)}
+.held-ev .ev{max-width:780px}
+.held-band{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;padding:0 0 18px}
+.held-amt{font-family:var(--mono);font-size:31px;letter-spacing:-.035em;line-height:1.1;margin-top:10px}
+.held-what{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:8px}
+.held-side{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:9px}
+.held-age{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.held-reason{padding:18px 0;border-top:1px solid var(--hair)}
+.held-reason p{font-size:14px;line-height:1.6;max-width:76ch}
+.held-ev{padding:0 0 18px}
+.control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:end;padding:18px 0 0;border-top:1px solid var(--hair)}
+.control .fields{display:flex;gap:10px;flex-wrap:wrap}
+.control .fields .f{display:flex;flex-direction:column;gap:5px;flex:1 1 170px}
+.control .fields .f.wide{flex:2 1 260px}
+.control label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.control .acts{display:flex;gap:9px;align-items:center}
+.control-note{grid-column:1/-1;font-size:12px;color:var(--dim);line-height:1.5}
+.resolved{display:flex;gap:12px;align-items:center;padding:16px 0 0;border-top:1px solid var(--hair);font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+
+/* ═══════════════════════ quarantine ═══════════════════════ */
+.consequence{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--hair)}
+.consequence div{padding:16px 26px 18px 0}
+.consequence div+div{padding-left:26px;border-left:1px solid var(--hair)}
+.consequence .c-k{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.consequence .c-v{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.55}
+.consequence .c-v b{color:var(--text);font-weight:400}
+
+/* ═══════════════════════ agents + orphans ═══════════════════════ */
+.orphan{border:1px solid var(--block-bd);border-radius:var(--r-card);background:var(--block-bg);
+  display:grid;grid-template-columns:auto minmax(0,1fr);gap:24px;padding:18px 20px;margin-bottom:16px;align-items:center}
+.orphan .amt{font-family:var(--mono);font-size:31px;letter-spacing:-.035em;color:var(--block)}
+.orphan .k{color:var(--block)}
+.orphan p{font-size:13.5px;color:var(--muted);margin-top:8px;max-width:70ch;line-height:1.55}
+.orphan p b{color:var(--text);font-weight:400}
+.agent-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.agent-head{padding:16px 18px;border-bottom:1px solid var(--hair)}
+.agent-head .lbl{font-size:15px;letter-spacing:-.01em}
+.agent-head .id{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:5px;word-break:break-all}
+.agent-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.agent-stats>div{padding:13px 18px;border-left:1px solid var(--hair)}
+.agent-stats>div:first-child{border-left:0}
+.agent-stats .k{font-size:11px;color:var(--dim);margin-bottom:5px}
+.agent-stats .v{font-family:var(--mono);font-size:17px;letter-spacing:-.02em}
+.callout{display:flex;gap:11px;align-items:flex-start;padding:13px 18px;border-top:1px solid var(--hair);font-size:12.5px;color:var(--muted);line-height:1.55}
+.finding{display:grid;grid-template-columns:104px minmax(0,1fr) 120px 150px;gap:16px;align-items:baseline;
+  padding:13px 18px;border-bottom:1px solid var(--hair)}
+.finding:last-child{border-bottom:0}
+.finding .kind{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.finding .detail{font-size:13px;color:var(--muted)}
+.finding .m{font-family:var(--mono);font-size:13px;text-align:right}
+.finding .e{font-family:var(--mono);font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;text-align:right}
+
+/* ═══════════════════════ audit rail ═══════════════════════ */
+.auditbar{position:fixed;left:0;right:0;bottom:0;z-index:38;background:var(--bg);border-top:1px solid var(--border)}
+.auditbar-in{height:34px;display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.auditbar .ok{color:var(--muted)}
+.auditbar .hash{letter-spacing:.06em;text-transform:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.auditbar .sep{color:var(--border)}
+.auditbar .right{margin-left:auto}
+
+/* ═══════════════════════ modal, toast, token, pop ═══════════════════════ */
+.modal{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal-card{position:relative;z-index:71;width:min(580px,100%);max-height:88vh;overflow-y:auto;background:var(--bg);
+  border:1px solid var(--border);border-radius:var(--r-panel);animation:mup .2s cubic-bezier(.2,.7,.3,1)}
+@keyframes mup{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.modal-head{padding:18px 20px 0}
+.modal-head h2{font-size:18px;font-weight:600;letter-spacing:-.02em;margin-top:10px}
+.modal-head p{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.55}
+.modal-body{padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+.modal-foot{display:flex;gap:10px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--border);flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.field input,.field textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-ctl);
+  padding:8px 10px;font-size:13px}
+.field textarea{min-height:62px;resize:vertical}
+.warnbox{border:1px solid var(--block-bd);background:var(--block-bg);border-radius:var(--r-ctl);padding:13px 14px;font-size:12.5px}
+.warnbox ul{margin:9px 0 0;padding-left:16px;color:var(--muted);line-height:1.6}
+.confirm{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:var(--muted);cursor:pointer;line-height:1.5}
+.confirm input{margin-top:2px;accent-color:var(--link);width:15px;height:15px}
+.toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:50px;z-index:80;display:flex;flex-direction:column;gap:8px;
+  align-items:center;pointer-events:none;padding:0 16px;width:100%;max-width:560px}
+.toast{display:flex;align-items:center;gap:10px;padding:10px 15px;border:1px solid var(--border);border-radius:var(--r-ctl);
+  background:var(--raised);font-size:13px;animation:mup .2s ease}
+.toast.bad{border-color:var(--block-bd)}
+.tokenwrap{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
+.tokencard{width:min(440px,100%);border:1px solid var(--border);border-radius:var(--r-panel);background:var(--surface);padding:26px}
+.tokencard .brandline{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.tokencard h1{font-size:18px;font-weight:600;letter-spacing:-.02em}
+.tokencard p{font-size:13px;color:var(--muted);margin:9px 0 18px;line-height:1.6}
+.tokencard .err{font-size:12px;color:var(--block);margin-top:10px;font-family:var(--mono)}
+.tokencard .hintline{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:18px;letter-spacing:.04em}
+.pop{position:absolute;top:calc(var(--top) - 4px);right:var(--gut);width:min(380px,calc(100vw - 32px));z-index:45;
+  border:1px solid var(--border);border-radius:var(--r-card);background:var(--surface);animation:mup .16s ease}
+.pop h3{padding:13px 15px 0}
+.pop .rowline{display:flex;gap:12px;align-items:center;padding:9px 15px;font-size:12.5px;border-bottom:1px solid var(--hair)}
+.pop .rowline:last-of-type{border-bottom:0}
+.pop .rowline .v{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;word-break:break-all}
+.pop .actions{display:flex;flex-wrap:wrap;gap:7px;padding:13px 15px;border-top:1px solid var(--hair)}
+.pop .note{padding:13px 15px;font-size:12px;color:var(--dim);border-top:1px solid var(--hair);line-height:1.6}
+.navbtn{display:none;align-items:center;gap:8px;height:28px;padding:0 11px;border:1px solid var(--border);border-radius:var(--r-ctl);
+  background:none;color:var(--text);cursor:pointer;font-size:13px}
+.navbtn svg{width:12px;height:12px;color:var(--dim)}
+.navpop{left:16px;right:16px;width:auto}
+.navpop .navitem{display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid var(--hair);background:none;
+  color:var(--muted);text-align:left;padding:13px 15px;font-size:14px;cursor:pointer}
+.navpop .navitem:last-child{border-bottom:0}
+.navpop .navitem[aria-current="page"]{color:var(--text);background:var(--raised)}
+.navpop .navitem .count{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--dim)}
+
+/* ═══════════════════════ responsive art direction ═══════════════════════ */
+@media (max-width:1240px){
+  .hero-value{font-size:48px}
+  .feed-head,.row{grid-template-columns:66px 92px 152px minmax(0,1fr) 108px 108px 50px}
+  .feed-head .r-agent,.row .r-agent{display:none}
+  .row .r-note{grid-column:3/-1}
+}
+@media (max-width:980px){
+  :root{--gut:18px}
+  .inst-main{grid-template-columns:minmax(0,1fr)}
+  .inst-hero{border-right:0;border-bottom:1px solid var(--hair);padding:22px 0 22px}
+  .ig:nth-child(3n+1){padding-left:0}
+  .hero-value{font-size:44px}
+  .feed-head,.row{grid-template-columns:66px 92px minmax(0,1fr) 108px 104px}
+  .feed-head .r-tool,.row .r-tool,.feed-head .r-lat,.row .r-lat{display:none}
+  .row .r-note{grid-column:2/-1}
+  .facts{grid-template-columns:minmax(0,1fr)}
+  .fact:nth-child(odd){padding-right:0;border-right:0}
+  .fact:nth-child(even){padding-left:0}
+  .fact:nth-last-child(-n+2){border-bottom:1px solid var(--hair)}
+  .fact:last-child{border-bottom:0}
+  .finding{grid-template-columns:96px minmax(0,1fr) 110px}
+  .finding .e{display:none}
+  .attempts{grid-template-columns:40px 84px 84px minmax(90px,1fr) 52px}
+  .attempts>div:nth-child(6n){display:none}
+  .attempts>div:nth-child(6n+1){border-left:0}
+}
+@media (max-width:720px){
+  .navbtn{display:inline-flex}
+  .tabsbar{display:none}
+  .mark span{display:none}
+  #chip-rail{display:none}
+  .chip{padding:0 10px}
+  .inst-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ig:nth-child(3n+1){border-left:1px solid var(--hair)}
+  .ig:nth-child(2n+1){border-left:0}
+  .ig:nth-child(n+4){border-bottom:1px solid var(--hair)}
+  .ig:nth-last-child(-n+2){border-bottom:0}
+  .ig-lat,.ig-dupes{display:none}
+  .hero-sub{display:none}
+  .filterbar .tail{display:none}
+  .ig{padding:12px 16px}
+  .ig-v{font-size:17px}
+  .inst-hero{padding:16px 18px 18px}
+  .hero-value{margin-top:9px}
+  .inst-bar{flex-wrap:wrap;gap:10px;padding:11px 18px}
+  .bar{flex:1 1 100%}
+  .hero-value{font-size:42px}
+  .hero-claim{font-size:14px;margin-top:12px}
+  .inst-hero{border-right:0}
+  .inst-hero{padding:18px 18px 20px}
+  .feed-head{display:none}
+  .rows{max-height:none}
+  .row{grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;padding:13px 16px;align-items:baseline;
+    grid-template-areas:"v a" "s s" "m l"}
+  .row .r-verdict{grid-area:v}
+  .row .r-amt{grid-area:a;font-size:14px;color:var(--text)}
+  .row .r-sum{grid-area:s;white-space:normal;color:var(--text);font-size:13.5px;line-height:1.45}
+  .row .r-meta{grid-area:m;display:block;font-family:var(--mono);font-size:10.5px;color:var(--dim);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .r-lat{grid-area:l;display:block}
+  .row .r-time,.row .r-tool,.row .r-risk,.row .r-agent{display:none}
+  .row.tier2 .r-note{grid-column:1/-1;margin-top:4px}
+  .row.tier2 .r-note .risk{color:inherit}
+  .drawer{width:100%;border-left:0;transform:translateY(20px)}
+  .dr-amount{font-size:32px}
+  .case-main{grid-template-columns:minmax(0,1fr)}
+  .case-left{border-right:0;padding:0 0 20px}
+  .case-right{padding:20px 0 0;border-top:1px solid var(--hair)}
+  .case-amt{font-size:42px}
+  .case-cmp{grid-template-columns:minmax(0,1fr);gap:12px}
+  .case-cmp .op{display:none}
+  .case{padding-left:16px;margin:24px 0 4px}
+  .ipath{gap:7px 18px}
+  .ipath li::after{display:none}
+  .dr-head,.dr-sect{padding-left:18px;padding-right:18px}
+  .compare-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+  .compare-op{display:none}
+  .held-band{grid-template-columns:minmax(0,1fr);gap:12px}
+  .held-side{align-items:flex-start;text-align:left;flex-direction:row;flex-wrap:wrap}
+  .control{grid-template-columns:minmax(0,1fr)}
+  .control .acts{width:100%}
+  .control .acts .btn{flex:1}
+  .consequence{grid-template-columns:minmax(0,1fr)}
+  .consequence div{padding-right:0}
+  .consequence div+div{border-left:0;border-top:1px solid var(--hair);padding-left:0;padding-top:16px}
+  .agent-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .agent-stats>div:nth-child(3){border-left:0;border-top:1px solid var(--hair)}
+  .orphan{grid-template-columns:minmax(0,1fr);gap:12px}
+  .attempts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .attempts>div.h{display:none}
+  .attempts>div{border-left:0;font-size:11px}
+  .kv{grid-template-columns:minmax(0,1fr)}
+  .kv>div.k{border-bottom:0;padding-bottom:0}
+  .mb{grid-template-columns:minmax(0,1fr) auto}
+  .mb-track{display:none}
+  .legend div{border-left:0;border-top:1px solid var(--hair)}
+  .legend div:first-child{border-top:0}
+  .auditbar-in{gap:9px}
+  .auditbar .right,.auditbar .n-records{display:none}
+  .pop{right:16px;left:16px;width:auto}
+  .tl-break{margin-left:-26px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
 </style>
 </head>
 <body>
+<a class="sr" href="#view">Skip to content</a>
 
-<div id="gate">
-  <div class="box">
-    <h2>Operator console</h2>
-    <p>Paste <span class="mono">INTERLOCK_CONSOLE_TOKEN</span>. It is kept for this tab only.</p>
-    <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="bearer token">
-    <div class="err" id="gate-err"></div>
-    <div style="margin-top:12px"><button id="unlock">Unlock</button></div>
+<!-- ── token entry ─────────────────────────────────────────────── -->
+<div id="token-screen" class="tokenwrap" hidden>
+  <div class="tokencard">
+    <div class="brandline">
+      <svg class="glyph" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="width:13px;height:13px;color:var(--muted)">
+        <rect x="1.5" y="1.5" width="8" height="8" stroke="currentColor" stroke-width="1.2"/>
+        <rect x="6.5" y="6.5" width="8" height="8" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <b style="font-weight:600;font-size:15px;letter-spacing:-.018em">Interlock</b>
+      <span class="eyebrow">console</span>
+    </div>
+    <h1>Console token</h1>
+    <p>The console authenticates with a single bearer token issued by the gate. There is no account and no login —
+       the token is the whole credential, and it stays in this browser.</p>
+    <div class="field" style="margin-bottom:12px">
+      <label for="gate-input">NEXT_PUBLIC_GATE_URL</label>
+      <input id="gate-input" class="mono" type="url" autocomplete="off" spellcheck="false" placeholder="http://localhost:8788">
+    </div>
+    <div class="field">
+      <label for="token-input">INTERLOCK_CONSOLE_TOKEN</label>
+      <input id="token-input" class="mono" type="password" autocomplete="off" spellcheck="false" placeholder="dev-token">
+    </div>
+    <div class="err" id="token-err" hidden></div>
+    <div style="display:flex;gap:9px;margin-top:18px">
+      <button class="btn primary" id="token-save">Use this token</button>
+      <button class="btn ghost" id="token-demo">Open the seeded demo</button>
+    </div>
+    <div class="hintline">gate · <span id="token-gate">not configured</span></div>
   </div>
 </div>
 
-<header>
-  <span class="dot" id="dot"></span>
-  <h1>Interlock</h1>
-  <span class="ts" id="ledger"></span>
-  <span class="spacer"></span>
-  <span class="ts" id="clock"></span>
-  <button id="lock">Lock</button>
-</header>
+<!-- ── app ─────────────────────────────────────────────────────── -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="wrap topbar-in">
+      <div class="mark">
+        <svg class="glyph" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="1.5" y="1.5" width="8" height="8" stroke="currentColor" stroke-width="1.2"/>
+          <rect x="6.5" y="6.5" width="8" height="8" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+        <b>Interlock</b><span>console</span>
+      </div>
+      <button class="navbtn" id="navbtn" aria-expanded="false" aria-haspopup="true">
+        <span id="navbtn-label">Decisions</span>
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="top-right">
+        <span class="chip" id="chip-rail" title="Environment"><span class="dot" id="rail-dot"></span>rail<b id="rail-name">mock</b></span>
+        <span class="chip" id="chip-stream" title="Server-sent event stream"><span class="dot" id="stream-dot"></span><b id="stream-state">connecting</b><span id="stream-age"></span></span>
+        <button class="iconbtn" id="sysbtn" aria-expanded="false" aria-haspopup="dialog" aria-label="System status">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4.5h12M2 8h12M2 11.5h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
 
-<main>
-  <div class="banner" id="banner"></div>
+  <div class="tabsbar" id="tabsbar">
+    <div class="wrap tabs" role="tablist" aria-label="Console sections">
+      <button class="tab" role="tab" data-screen="decisions">Decisions</button>
+      <button class="tab" role="tab" data-screen="held">Held <span class="count" id="cnt-held">0</span></button>
+      <button class="tab" role="tab" data-screen="quarantine">Quarantine <span class="count" id="cnt-quar">0</span></button>
+      <button class="tab" role="tab" data-screen="agents">Agents</button>
+    </div>
+  </div>
 
-  <section>
-    <h2>Now</h2>
-    <div class="kpis" id="kpis"></div>
-  </section>
+  <div class="wrap" style="padding-top:16px"><div class="banners" id="banners"></div></div>
 
-  <section>
-    <h2>Held — waiting on you</h2>
-    <div id="held"></div>
-  </section>
+  <main id="view" class="wrap" tabindex="-1"></main>
 
-  <section>
-    <h2>Quarantined — the engine could not decide</h2>
-    <div id="quarantine"></div>
-  </section>
+  <footer class="auditbar">
+    <div class="wrap auditbar-in" id="auditbar">
+      <span class="dot"></span><span>audit chain — checking</span>
+    </div>
+  </footer>
+</div>
 
-  <section>
-    <h2>Decisions</h2>
-    <div id="decisions"></div>
-  </section>
-
-  <section>
-    <h2>Audit stream</h2>
-    <div class="stream" id="stream"></div>
-  </section>
-</main>
-
+<div id="pop-root"></div>
+<div id="drawer-root"></div>
+<div id="modal-root"></div>
+<div class="toasts" id="toast-root" aria-live="polite" role="status"></div>
 <script>
-const $ = (id) => document.getElementById(id);
-let TOKEN = sessionStorage.getItem('interlock_token') || '';
-let source = null;
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════════
+   Interlock console — single-file build.
 
-const rupees = (minor) =>
-  '₹' + (minor / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const when = (ms) => new Date(ms).toLocaleString('en-IN', { hour12: false });
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+   Data model is the contract (packages/contract, Zod). Every fetch in this
+   file goes through the Gate client below, which has two implementations:
 
-async function api(path, options = {}) {
-  const res = await fetch(path, {
-    ...options,
-    headers: { 'content-type': 'application/json', authorization: 'Bearer ' + TOKEN, ...(options.headers || {}) },
+     RemoteGate  — the real gate or `node mock-server.mjs`. Bearer token in a
+                   header on everything except /api/health, token on the query
+                   string for /api/stream only, because EventSource cannot
+                   send headers.
+     LocalGate   — the same contract served from memory, with the seeded
+                   fixtures and the live SSE feed from mock-server.mjs, so the
+                   console demonstrates itself with no backend running.
+
+   To point this at a gate:  window.INTERLOCK_GATE_URL = 'https://…'
+   or  ?gate=https://…&token=…   — nothing else in this file changes.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────── 0 · small tools ───────────────────────────── */
+const ls = {
+  get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch(e){} },
+  del(k){ try { localStorage.removeItem(k); } catch(e){} }
+};
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.prototype.slice.call(r.querySelectorAll(s));
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+/** Money is an integer in paise. Divide only here, at render time. */
+function money(minor){
+  if (minor == null || !isFinite(minor)) return '—';
+  const neg = minor < 0, abs = Math.abs(Math.trunc(minor));
+  return (neg?'-':'') + '₹' + Math.trunc(abs/100).toLocaleString('en-IN');
+}
+/** Exact rupees-and-paise, for the places where the paise matter. */
+function moneyExact(minor){
+  if (minor == null || !isFinite(minor)) return '—';
+  const abs = Math.abs(Math.trunc(minor));
+  const p = String(abs % 100).padStart(2,'0');
+  return (minor<0?'-':'') + '₹' + Math.trunc(abs/100).toLocaleString('en-IN') + '.' + p;
+}
+const clock = ms => new Date(ms).toLocaleTimeString('en-GB',{hour12:false});
+const stamp = ms => new Date(ms).toLocaleString('en-GB',{hour12:false,day:'2-digit',month:'short',year:'numeric'})
+                    .replace(',','') ;
+function ago(ms){
+  const s = Math.max(0, Math.round((Date.now()-ms)/1000));
+  if (s < 60) return s+'s';
+  const m = Math.floor(s/60); if (m < 60) return m+'m';
+  const h = Math.floor(m/60); if (h < 48) return h+'h '+(m%60)+'m';
+  return Math.floor(h/24)+'d';
+}
+const lat = n => (n==null? '—' : n+'ms');
+const short = (s,n=14) => !s ? '—' : (s.length>n ? s.slice(0,n)+'…' : s);
+
+/* ───────────────────────────── 1 · vocabulary ───────────────────────────── */
+const GATES = [
+  { id:'g1_scope', n:1, name:'Scope', kind:'deterministic',
+    desc:"The tool is granted by the mandate, and the mandate has not expired." },
+  { id:'g2_value', n:2, name:'Value authorisation', kind:'deterministic',
+    desc:"Interlock resolves the referent from the rail over its own read-only client and compares against it. The amount that arrived in the agent's arguments is never treated as authority." },
+  { id:'g3_limits', n:3, name:'Ceilings, velocity & fee budget', kind:'deterministic',
+    desc:"Per-action ceiling, rolling velocity, and the 30-day fee budget — fees read from rail responses, never from a rate table." },
+  { id:'g4_exactly_once', n:4, name:'Exactly-once', kind:'deterministic',
+    desc:"Semantic idempotency key, write-ahead log, intent state machine. A duplicate is a state that already exists, not a guess." },
+  { id:'g5_purpose', n:5, name:'Purpose match', kind:'model',
+    desc:"Advisory and downgrade-only. A model gate cannot express ALLOW — the verdict type has no such member. Off unless --purpose-check is passed." },
+  { id:'g6_provenance', n:6, name:'Provenance', kind:'deterministic',
+    desc:"The upstream tool manifest is hash-pinned. A changed manifest or a crossed trust tier stops here." },
+  { id:'post_verify', n:7, name:'Outcome verification', kind:'deterministic',
+    desc:"Ledger diff after the call, with every rupee attributed to the intent that moved it." }
+];
+const GATE_BY_ID = Object.fromEntries(GATES.map(g=>[g.id,g]));
+
+const STATE_TONE = {
+  PROPOSED:'', AUTHORIZED:'good', IN_FLIGHT:'', APPLIED:'good', CONFIRMED_NOT_APPLIED:'good',
+  HELD:'warn', UNKNOWN:'warn', RECONCILING:'warn',
+  BLOCKED:'bad', QUARANTINED:'bad', FAILED_TERMINAL:'bad'
+};
+const STATE_MEANING = {
+  PROPOSED:'SIK derived, row inserted',
+  AUTHORIZED:'cleared the ladder, not yet written',
+  IN_FLIGHT:'durable row on disk, call issued',
+  APPLIED:'terminal — the rail applied it once',
+  FAILED_TERMINAL:'terminal — the rail refused deterministically',
+  UNKNOWN:'ambiguous. never retried from here',
+  RECONCILING:'asking the rail what actually happened',
+  CONFIRMED_NOT_APPLIED:'provably absent after full pagination',
+  QUARANTINED:'still unknown after max attempts — a human decides',
+  BLOCKED:'terminal — stopped at the gate',
+  HELD:'waiting on a human'
+};
+/** Transitions the exactly-once story turns on. */
+const KEY_TRANSITIONS = new Set([
+  'AUTHORIZED>IN_FLIGHT','IN_FLIGHT>UNKNOWN','UNKNOWN>RECONCILING',
+  'RECONCILING>APPLIED','RECONCILING>CONFIRMED_NOT_APPLIED','RECONCILING>QUARANTINED'
+]);
+const EMPTY = {
+  held:      { k:'Nothing waiting.', s:'Every action in the last 24 hours cleared the gate on its own.' },
+  quarantine:{ k:'No ambiguous actions.', s:'The rail answered every call.' },
+  findings:  { k:'No duplicates, phantoms or orphans in the sweep window.', s:'The reconciliation sweep matched every intent to exactly one rail entity.' },
+  decisions: { k:'No decisions match this filter.', s:'Clear the filter to see the full stream.' }
+};
+
+/* ───────────────────────────── 2 · seeded fixtures ────────────────────────
+   The four stories from mock-server.mjs, kept verbatim so the console shows
+   the same rows whether it is pointed at the mock or running standalone.    */
+function buildFixtures(){
+  let seed = 20260903;
+  const rnd = () => { seed = (seed*1664525 + 1013904223) >>> 0; return seed/4294967296; };
+  const now = Date.now();
+
+  const AGENTS = [
+    { agent_id:'support-agent',  label:'Support agent',   mandate_id:'md_support',  mandate_hash:'sha256:9f2c4a1b' },
+    { agent_id:'cashflow-agent', label:'Cash-flow agent', mandate_id:'md_cashflow', mandate_hash:'sha256:3e77b012' }
+  ];
+  const TOOLS = ['create_refund','create_payment_link','create_instant_settlement','fetch_payment','fetch_order'];
+
+  let SEQ = 1000;
+  const decisions = [], held = [], quarantine = [], findings = [], intents = new Map();
+
+  const G = (gate, verdict, code, message, evidence) => ({
+    gate, kind: gate === 'g5_purpose' ? 'model' : 'deterministic', verdict,
+    reasons: code ? [{ code, message }] : (message ? [{ code:'OK', message }] : []),
+    evidence: evidence ?? null, latency_ms: 1 + Math.floor(rnd()*4)
   });
-  if (res.status === 401) { lock('That token was refused.'); throw new Error('unauthorised'); }
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body?.error?.message || ('HTTP ' + res.status));
-  return body;
+
+  function mkDecision(o){
+    const d = {
+      decision_id:`dec_${(SEQ++).toString(36)}`, action_id:`act_${(SEQ++).toString(36)}`,
+      sik:o.sik ?? null, agent_id:o.agent_id, tool:o.tool, verdict:o.verdict,
+      amount_minor:o.amount ?? 0, rupees_at_risk_minor:o.risk ?? 0,
+      mandate_hash:(AGENTS.find(a=>a.agent_id===o.agent_id)||{}).mandate_hash ?? 'sha256:0',
+      total_latency_ms:o.latency ?? (3 + Math.floor(rnd()*9)),
+      created_at:o.at ?? Date.now(), summary:o.summary, gate_results:o.gates ?? []
+    };
+    decisions.unshift(d);
+    if (decisions.length > 500) decisions.pop();
+    registerIntent(d);
+    return d;
+  }
+
+  function registerIntent(d){
+    if (!d.sik || intents.has(d.sik)) return;
+    const state = d.verdict==='ALLOW' ? 'APPLIED' : d.verdict==='HOLD' ? 'HELD' : 'BLOCKED';
+    intents.set(d.sik, {
+      sik:d.sik, merchant_id:'acc_ArjunNutrition', agent_id:d.agent_id, tool:d.tool,
+      subject_id:'pay_QmX2', amount_minor:d.amount_minor, currency:'INR',
+      reversibility: d.tool==='create_refund' ? 'COMPENSABLE' : 'REVERSIBLE',
+      state, attempt_seq:1, reconcile_attempts:0,
+      rail_entity_id: d.verdict==='ALLOW' ? 'rfnd_'+d.sik.slice(3,7) : null,
+      mandate_hash:d.mandate_hash, first_seen_at:d.created_at, updated_at:d.created_at,
+      transitions:[
+        { at:d.created_at,     from:null,        to:'PROPOSED', event:'propose', note:'SIK derived, row inserted' },
+        { at:d.created_at+4,   from:'PROPOSED',  to:state,      event:'ladder',  note:d.summary },
+        ...(d.verdict==='ALLOW' ? [
+          { at:d.created_at+9,   from:'AUTHORIZED', to:'IN_FLIGHT', event:'commit_wal', note:'fsync complete, lease +30s' },
+          { at:d.created_at+240, from:'IN_FLIGHT',  to:'APPLIED',   event:'rail_2xx',   note:'receipt ilk_'+d.sik.slice(0,12) }
+        ] : [])
+      ],
+      attempts:[{ attempt_seq:1, started_at:d.created_at+9, finished_at:d.created_at+240,
+                  outcome: d.verdict==='ALLOW' ? 'APPLIED' : null,
+                  http_status: d.verdict==='ALLOW' ? 200 : null, rail_error_code:null }]
+    });
+    // an ALLOW passes PROPOSED → AUTHORIZED before it is written
+    const it = intents.get(d.sik);
+    if (d.verdict === 'ALLOW') it.transitions[1].to = 'AUTHORIZED';
+  }
+
+  const t0 = now - 1000*60*42;
+
+  // 24 clean refunds first, so the three stories are the most recent rows on screen
+  for (let i=0;i<24;i++){
+    mkDecision({ agent_id:'support-agent', tool:'create_refund', verdict:'ALLOW', risk:0,
+      at:t0+i*82000, amount:(340+i*11)*100,
+      summary:`Refund ₹${(340+i*11).toLocaleString('en-IN')} on an approved return`,
+      sik:`ILK${String(i.toString(36).toUpperCase()).padStart(2,'0')}JD8KM4NX6QZ0T3RVB9CHS7YG`,
+      gates:[ G('g1_scope','ALLOW'), G('g2_value','ALLOW',null,'resolved against order, referent matched'),
+        G('g3_limits','ALLOW'), G('g4_exactly_once','ALLOW',null,'no prior intent for this SIK'),
+        G('g6_provenance','ALLOW',null,'manifest sha256:9f2c… unchanged, 41 tools') ]});
+  }
+  const oldestAllow = decisions[decisions.length-1];
+
+  // 3 — the fee-budget hold
+  const decHold = mkDecision({ agent_id:'cashflow-agent', tool:'create_instant_settlement', verdict:'HOLD',
+    risk:30000000, at:now-1000*60*7, amount:30000000,
+    summary:'Fee budget for 30d would be exceeded — ₹1,062 fee on this action, ₹29,736 spent of ₹30,000',
+    gates:[ G('g1_scope','ALLOW'), G('g2_value','ALLOW',null,'settlement amount resolved from the balance'),
+      G('g3_limits','HOLD','FEE_BUDGET_EXCEEDED','30d fee budget 3000000 would be exceeded',
+        { window:'30d', fee_spent_minor:2973600, this_fee_minor:106200, max_fee_minor:3000000 }) ]});
+  // 2 — the duplicate refund
+  mkDecision({ agent_id:'support-agent', tool:'create_refund', verdict:'BLOCK', risk:340000,
+    at:now-1000*60*5, amount:340000,
+    summary:'Duplicate refund — same semantic action already applied as rfnd_PqR7',
+    sik:'ILK2WD8KJ4NM6XQ0ZT3RVB9CHS7YGPE5',
+    gates:[ G('g1_scope','ALLOW'), G('g2_value','ALLOW'), G('g3_limits','ALLOW'),
+      G('g4_exactly_once','BLOCK','ALREADY_APPLIED','intent already in state APPLIED',
+        { rail_entity_id:'rfnd_PqR7', first_seen_at:t0-90000, attempt_seq:1 }) ]});
+  // 1 — the ₹48,000 block
+  mkDecision({ agent_id:'support-agent', tool:'create_refund', verdict:'BLOCK', risk:4800000,
+    at:now-1000*60*3, amount:4800000,
+    summary:'Refund of ₹48,000 on a ₹1,899 damage claim — value not authorised by the resolved order',
+    sik:'ILK7QP3M2X9KZB4TR6VNDH8SJC5WYFA1',
+    gates:[
+      G('g1_scope','ALLOW',null,'create_refund is granted by md_support'),
+      G('g2_value','BLOCK','VALUE_NOT_AUTHORISED','amount 4800000 exceeds authorised referent 189900',
+        { resolved_order:'order_A8841', order_amount_minor:4800000, claimed_line_item_minor:189900, return_record:null })
+    ]});
+
+  held.push({
+    held_id:'held_01', decision_id:oldestAllow.decision_id,
+    sik:'ILK5MN2QW8XJ4KD6TZ0RVB3CHS9YGPE7', agent_id:'support-agent', tool:'create_refund', amount_minor:340000,
+    reason_code:'SIK_COLLISION_SUSPECTED',
+    reason:'A refund of ₹3,400 on payment pay_QmX2 was already applied. Declare a distinct reason if this is a genuine second refund.',
+    evidence:{ existing_rail_entity_id:'rfnd_PqR7', existing_applied_at:t0-90000 },
+    status:'open', created_at:now-1000*60*11
+  });
+  held.push({
+    held_id:'held_02', decision_id:decHold.decision_id, sik:null,
+    agent_id:'cashflow-agent', tool:'create_instant_settlement', amount_minor:30000000,
+    reason_code:'FEE_BUDGET_EXCEEDED',
+    reason:'30-day fee budget would be exceeded. ₹29,736 of ₹30,000 already spent on instant settlement fees.',
+    evidence:{ window:'30d', fee_spent_minor:2973600, this_fee_minor:106200 },
+    status:'open', created_at:decHold.created_at
+  });
+
+  quarantine.push({
+    sik:'ILK9XK3PM7QW2JD5TZ0RVB8CHS4YGNE6', agent_id:'support-agent', tool:'create_refund', amount_minor:280000,
+    state:'QUARANTINED', reason_code:'STILL_UNKNOWN_AFTER_MAX_ATTEMPTS',
+    reason:'Rail unreachable for 94s during reconcile. 6 attempts, all inconclusive. Never retried.',
+    reconcile_attempts:6, attempt_seq:1, first_seen_at:t0+400000, updated_at:t0+520000
+  });
+
+  findings.push(
+    { finding_id:'f_01', kind:'orphan', severity:'high', sik:null, rail_entity_id:'rfnd_ZZ91',
+      amount_minor:150000, agent_id:null, detected_at:t0+600000,
+      detail:'Refund on the rail with no intent record — something bypassed the gate.' },
+    { finding_id:'f_02', kind:'phantom', severity:'high', sik:'ILK4TT2QW8XJ4KD6TZ0RVB3CHS9YGPE1',
+      rail_entity_id:null, amount_minor:99000, agent_id:'support-agent', detected_at:t0+660000,
+      detail:'Intent APPLIED but no matching rail entity after full pagination.' }
+  );
+
+  /* ── the intents the four stories point at ───────────────────────────────
+     The quarantined SIK is the kill -9 story: a durable IN_FLIGHT row, a dead
+     process, recovery to UNKNOWN, six reconcile passes, and a human queue —
+     no retry anywhere on that path.                                        */
+  (function killNine(){
+    const q = quarantine[0], t = q.first_seen_at, tr = [], at = [];
+    tr.push({ at:t,      from:null,          to:'PROPOSED',   event:'propose',    note:'SIK derived from (merchant, tool, subject, amount, reason). Row inserted.' });
+    tr.push({ at:t+5,    from:'PROPOSED',    to:'AUTHORIZED', event:'ladder',     note:'Gates 1–4 cleared. Refund ₹2,800 on payment pay_QmX2, approved return rtn_5512.' });
+    tr.push({ at:t+11,   from:'AUTHORIZED',  to:'IN_FLIGHT',  event:'commit_wal', note:'Write-ahead record fsynced before the call. Lease taken, +30s.' });
+    tr.push({ at:t+31000,from:'IN_FLIGHT',   to:'UNKNOWN',    event:'recovered',  note:'Process died mid-call (SIGKILL). Lease expired; the row was found on disk at boot. Outcome unknown — no retry is issued from this state.' });
+    let cur = t+33000;
+    for (let n=1;n<=6;n++){
+      tr.push({ at:cur, from:'UNKNOWN', to:'RECONCILING', event:'reconcile', note:`Sweep tick ${n} of 6. Lease taken; listing refunds for pay_QmX2 with full pagination.` });
+      const done = cur + 9000 + n*1200;
+      if (n < 6){
+        tr.push({ at:done, from:'RECONCILING', to:'UNKNOWN', event:'inconclusive',
+                  note:`Rail unreachable — pagination did not complete, so absence is not proven. Backoff ${Math.min(60, Math.pow(2,n))}s.` });
+        at.push({ attempt_seq:1, started_at:cur, finished_at:done, outcome:'UNKNOWN', http_status:null, rail_error_code:'ETIMEDOUT' });
+        cur = done + Math.min(60, Math.pow(2,n))*1000;
+      } else {
+        tr.push({ at:done, from:'RECONCILING', to:'QUARANTINED', event:'max_attempts',
+                  note:'Six passes, all inconclusive. Quarantined for a human rather than retried. This is the deliberate outcome, not a failure.' });
+        at.push({ attempt_seq:1, started_at:cur, finished_at:done, outcome:'UNKNOWN', http_status:null, rail_error_code:'ETIMEDOUT' });
+      }
+    }
+    intents.set(q.sik, {
+      sik:q.sik, merchant_id:'acc_ArjunNutrition', agent_id:q.agent_id, tool:q.tool, subject_id:'pay_QmX2',
+      amount_minor:q.amount_minor, currency:'INR', reversibility:'COMPENSABLE', state:'QUARANTINED',
+      attempt_seq:1, reconcile_attempts:6, rail_entity_id:null, mandate_hash:'sha256:9f2c4a1b',
+      first_seen_at:t, updated_at:q.updated_at, transitions:tr, attempts:at
+    });
+  })();
+
+  // the duplicate: the SIK already exists in APPLIED, so the second proposal never became a row
+  (function duplicate(){
+    const sik = 'ILK2WD8KJ4NM6XQ0ZT3RVB9CHS7YGPE5', t = t0 - 90000;
+    intents.set(sik, {
+      sik, merchant_id:'acc_ArjunNutrition', agent_id:'support-agent', tool:'create_refund', subject_id:'pay_QmX2',
+      amount_minor:340000, currency:'INR', reversibility:'COMPENSABLE', state:'APPLIED',
+      attempt_seq:1, reconcile_attempts:0, rail_entity_id:'rfnd_PqR7', mandate_hash:'sha256:9f2c4a1b',
+      first_seen_at:t, updated_at:t0+60000,
+      transitions:[
+        { at:t,       from:null,         to:'PROPOSED',   event:'propose',    note:'First proposal. SIK derived, row inserted.' },
+        { at:t+6,     from:'PROPOSED',   to:'AUTHORIZED', event:'ladder',     note:'Refund ₹3,400 on an approved return.' },
+        { at:t+12,    from:'AUTHORIZED', to:'IN_FLIGHT',  event:'commit_wal', note:'fsync complete, lease +30s.' },
+        { at:t+380,   from:'IN_FLIGHT',  to:'APPLIED',    event:'rail_2xx',   note:'Rail applied it once. rail_entity_id rfnd_PqR7.' },
+        { at:t0+60000,from:'APPLIED',    to:'APPLIED',    event:'propose',    note:'Second proposal from support-agent, same semantic key. Primary-key conflict against an APPLIED intent — returned BLOCK ALREADY_APPLIED with the original rfnd_PqR7. No second row, no second call.' }
+      ],
+      attempts:[{ attempt_seq:1, started_at:t+12, finished_at:t+380, outcome:'APPLIED', http_status:200, rail_error_code:null }]
+    });
+  })();
+
+  // the held SIK collision
+  (function heldIntent(){
+    const h = held[0];
+    intents.set(h.sik, {
+      sik:h.sik, merchant_id:'acc_ArjunNutrition', agent_id:h.agent_id, tool:h.tool, subject_id:'pay_QmX2',
+      amount_minor:h.amount_minor, currency:'INR', reversibility:'COMPENSABLE', state:'HELD',
+      attempt_seq:1, reconcile_attempts:0, rail_entity_id:null, mandate_hash:'sha256:9f2c4a1b',
+      first_seen_at:h.created_at, updated_at:h.created_at,
+      transitions:[
+        { at:h.created_at,   from:null,       to:'PROPOSED', event:'propose', note:'SIK derived, row inserted.' },
+        { at:h.created_at+7, from:'PROPOSED', to:'HELD',     event:'ladder',  note:h.reason }
+      ],
+      attempts:[{ attempt_seq:1, started_at:h.created_at+7, finished_at:null, outcome:null, http_status:null, rail_error_code:null }]
+    });
+  })();
+
+  return { AGENTS, TOOLS, decisions, held, quarantine, findings, intents, mkDecision, G, rnd, t0 };
 }
 
-/**
- * 503 is a state, not an error.
- *
- * The gate restarted and is settling intents that were in flight when it died.
- * Saying so is the whole point: an operator who sees a red toast reaches for
- * the runbook, and an operator who reads this sentence waits thirty seconds.
- */
-async function health() {
-  try {
-    const res = await fetch('/health');
-    const body = await res.json();
-    const recovering = res.status === 503;
-    $('dot').className = 'dot ' + (recovering ? 'bad' : 'ok');
-    $('banner').className = 'banner' + (recovering ? ' on' : '');
-    if (recovering) {
-      $('banner').textContent =
-        'Reconciling ' + body.outstanding + ' intent' + (body.outstanding === 1 ? '' : 's') +
-        ' that were in flight when the gate restarted. Decisions are paused until this finishes.';
-    }
-  } catch {
-    $('dot').className = 'dot bad';
+/* ───────────────────────────── 3 · the gate client ─────────────────────── */
+class ApiFail extends Error {
+  constructor(status, err){
+    super((err && err.message) || 'Request failed');
+    this.status = status;
+    this.code = (err && err.code) || 'NETWORK';
+    this.requestId = (err && err.requestId) || null;
   }
 }
 
-function kpis(s) {
-  const held = s.counts.HELD || 0, quarantined = s.counts.QUARANTINED || 0;
-  const card = (label, value, warn) =>
-    '<div class="kpi' + (warn ? ' warn' : '') + '"><span>' + label + '</span><b>' + value + '</b></div>';
-  $('kpis').innerHTML =
-    card('Needs a person', s.needs_attention, s.needs_attention > 0) +
-    card('Held', held, held > 0) +
-    card('Quarantined', quarantined, quarantined > 0) +
-    card('In progress', s.in_progress) +
-    card('Applied · 24h', s.applied_24h.calls) +
-    card('Moved · 24h', rupees(s.applied_24h.amount_minor)) +
-    card('Audit records', s.audit.records);
-}
-
-function rows(list, actions) {
-  return '<table><thead><tr><th>SIK</th><th>Tool</th><th>Subject</th><th>Amount</th>' +
-    '<th>Since</th><th></th></tr></thead><tbody>' +
-    list.map((i) =>
-      '<tr><td class="sik">' + esc(i.sik.slice(0, 12)) + '…</td>' +
-      '<td class="mono">' + esc(i.tool) + '</td>' +
-      '<td class="mono sik">' + esc(i.subject_id) + '</td>' +
-      '<td class="amt">' + rupees(i.amount_minor) + '</td>' +
-      '<td class="ts">' + when(i.updated_at) + '</td>' +
-      '<td style="text-align:right;white-space:nowrap">' + actions(i) + '</td></tr>').join('') +
-    '</tbody></table>';
-}
-
-async function queues() {
-  const held = (await api('/api/held')).intents;
-  $('held').innerHTML = held.length === 0
-    ? '<div class="empty">Nothing is waiting on a decision.</div>'
-    : rows(held, (i) =>
-        '<button class="allow" data-op="approve" data-sik="' + i.sik + '">Approve</button> ' +
-        '<button class="block" data-op="deny" data-sik="' + i.sik + '">Deny</button>');
-
-  const q = (await api('/api/quarantine')).intents;
-  // An empty quarantine queue is success, not emptiness. It means every
-  // ambiguous outcome was resolved without a person having to intervene.
-  $('quarantine').innerHTML = q.length === 0
-    ? '<div class="empty good">Nothing quarantined. Every ambiguous outcome resolved itself.</div>'
-    : rows(q, (i) =>
-        '<button class="allow" data-op="confirm-applied" data-sik="' + i.sik + '">It happened</button> ' +
-        '<button data-op="confirm-not-applied" data-sik="' + i.sik + '">It did not</button>');
-}
-
-async function decisions() {
-  const list = (await api('/api/decisions?limit=25')).decisions;
-  $('decisions').innerHTML = list.length === 0
-    ? '<div class="empty">No decisions yet.</div>'
-    : '<table><thead><tr><th>Verdict</th><th>SIK</th><th>Gates</th><th>When</th></tr></thead><tbody>' +
-      list.map((d) => {
-        const failing = d.gates.find((g) => g.verdict !== 'ALLOW');
-        return '<tr><td><span class="badge ' + esc(d.verdict) + '">' + esc(d.verdict) + '</span></td>' +
-          '<td class="sik">' + esc(d.sik.slice(0, 12)) + '…</td>' +
-          '<td class="mono sik">' + esc(failing ? failing.gate + ' · ' + failing.reason_code : d.gates.length + ' passed') + '</td>' +
-          '<td class="ts">' + when(d.decided_at) + '</td></tr>';
-      }).join('') + '</tbody></table>';
-}
-
-function stream() {
-  if (source) source.close();
-  // EventSource cannot send an Authorization header, so the token rides as a
-  // query parameter on this one route. It is the same shared secret either
-  // way; noted here so nobody mistakes it for a second mechanism.
-  source = new EventSource('/api/stream?token=' + encodeURIComponent(TOKEN));
-  const box = $('stream');
-  source.addEventListener('audit', (e) => {
-    const r = JSON.parse(e.data);
-    const line = document.createElement('div');
-    line.innerHTML = '<span class="ts">' + when(r.ts) + '</span> ' +
-      '<span class="mono">' + esc(r.kind) + '</span> ' +
-      '<span class="sik mono">#' + r.seq + '</span>';
-    box.prepend(line);
-    while (box.childElementCount > 200) box.lastElementChild.remove();
-    refresh();
-  });
-  source.addEventListener('hello', () => { box.innerHTML = ''; });
-}
-
-/**
- * The reason is the point, so it gets a real field.
- *
- * This was prompt() first. Two things were wrong with that: a modal blocks the
- * whole page while an operator decides how to word something that becomes a
- * permanent audit record, and errors came back through alert(), which loses
- * the field values and makes the operator retype everything. The form opens in
- * the row it belongs to and keeps what was typed when the server says no.
- */
-function closeForms() {
-  document.querySelectorAll('tr.form-row').forEach((r) => r.remove());
-}
-
-function openForm(button) {
-  const { sik, op } = button.dataset;
-  const row = button.closest('tr');
-  const already = row.nextElementSibling;
-  closeForms();
-  if (already && already.classList.contains('form-row')) return;
-
-  const wantsEntity = op === 'confirm-applied';
-  const verb = { approve: 'Approve', deny: 'Deny',
-    'confirm-applied': 'Record as applied', 'confirm-not-applied': 'Record as not applied' }[op];
-
-  const tr = document.createElement('tr');
-  tr.className = 'form-row';
-  tr.innerHTML =
-    '<td colspan="6"><div class="form">' +
-      '<label>Why? Written to the audit log verbatim.' +
-        '<input class="reason" autocomplete="off" placeholder="e.g. confirmed with the customer on ticket 4471"></label>' +
-      (wantsEntity
-        ? '<label>Which rail entity did you find?' +
-          '<input class="entity" autocomplete="off" spellcheck="false" placeholder="rfnd_..."></label>'
-        : '') +
-      '<label>Your name<input class="operator" autocomplete="off" placeholder="who is deciding"></label>' +
-      '<div class="form-actions">' +
-        '<button class="' + (op === 'deny' ? 'block' : 'allow') + ' go">' + verb + '</button>' +
-        '<button class="cancel">Cancel</button>' +
-        '<span class="err inline"></span>' +
-      '</div>' +
-    '</div></td>';
-  row.after(tr);
-  tr.querySelector('.reason').focus();
-
-  tr.querySelector('.cancel').addEventListener('click', closeForms);
-  tr.querySelector('.go').addEventListener('click', async () => {
-    const reason = tr.querySelector('.reason').value.trim();
-    const err = tr.querySelector('.err');
-    if (reason === '') { err.textContent = 'A reason is required.'; return; }
-    const body = { reason, operator: tr.querySelector('.operator').value.trim() || 'console' };
-    if (wantsEntity) {
-      const entity = tr.querySelector('.entity').value.trim();
-      if (entity === '') { err.textContent = 'The rail entity id is required.'; return; }
-      body.rail_entity_id = entity;
-    }
-    err.textContent = '';
+class RemoteGate {
+  constructor(base, token){ this.base = base.replace(/\/$/,''); this.token = token; this.kind = 'remote'; }
+  async req(path, opts){
+    const o = opts || {};
+    let res;
     try {
-      await api('/api/intents/' + encodeURIComponent(sik) + '/' + op, {
-        method: 'POST', body: JSON.stringify(body),
+      res = await fetch(this.base + path, {
+        method: o.method || 'GET',
+        headers: Object.assign({ Authorization:'Bearer ' + this.token }, o.body ? {'content-type':'application/json'} : {}),
+        body: o.body ? JSON.stringify(o.body) : undefined
       });
-      closeForms();
-      await refresh();
-    } catch (error) {
-      // Keep what was typed. Retyping a justification is how people stop
-      // writing real ones.
-      err.textContent = error.message;
+    } catch (e) {
+      throw new ApiFail(0, { code:'NETWORK', message:'Cannot reach the gate at ' + this.base });
+    }
+    let data = null;
+    try { data = await res.json(); } catch(e){}
+    if (path === '/api/health') return data;                 // 503 while recovering is a state, not an error
+    if (!res.ok) throw new ApiFail(res.status, data && data.error);
+    return data;
+  }
+  health(){ return this.req('/api/health'); }
+  summary(){ return this.req('/api/summary'); }
+  decisions(q){
+    const p = new URLSearchParams();
+    Object.keys(q||{}).forEach(k => { if (q[k] != null && q[k] !== '') p.set(k, q[k]); });
+    return this.req('/api/decisions' + (p.toString() ? '?'+p : ''));
+  }
+  decision(id){ return this.req('/api/decisions/' + encodeURIComponent(id)); }
+  intent(sik){ return this.req('/api/intents/' + encodeURIComponent(sik)); }
+  heldList(status){ return this.req('/api/held?status=' + (status||'open')); }
+  resolveHeld(id, action, body){ return this.req(`/api/held/${encodeURIComponent(id)}/${action}`, { method:'POST', body }); }
+  quarantine(){ return this.req('/api/quarantine'); }
+  resolveQuarantine(sik, body){ return this.req(`/api/quarantine/${encodeURIComponent(sik)}/resolve`, { method:'POST', body }); }
+  agents(){ return this.req('/api/agents'); }
+  findings(kind){ return this.req('/api/findings' + (kind ? '?kind='+kind : '')); }
+  mandates(){ return this.req('/api/mandates'); }
+  audit(){ return this.req('/api/audit/verify'); }
+  /** EventSource cannot send headers — the gate accepts the token on this one route only. */
+  connect(on){
+    const es = new EventSource(this.base + '/api/stream?token=' + encodeURIComponent(this.token), { withCredentials:false });
+    ['hello','heartbeat','decision','summary','held','held_resolved','quarantine','quarantine_resolved','finding']
+      .forEach(name => es.addEventListener(name, e => {
+        let data = null; try { data = JSON.parse(e.data); } catch(err){ return; }
+        on(name, data);
+      }));
+    es.onerror = () => on('__error', null);
+    es.onopen  = () => on('__open', null);
+    return { close(){ try { es.close(); } catch(e){} } };
+  }
+}
+
+/** The same contract, served from memory. Seeded fixtures + the live feed. */
+class LocalGate {
+  constructor(){
+    this.kind = 'local';
+    this.fx = buildFixtures();
+    this.boot = Date.now();
+    this.state = { status:'ok', stranded:0 };
+    this.failNext = 0;
+    this.listeners = new Set();
+    this.timers = [];
+    this.streamDown = false;
+  }
+  async wait(){ await sleep(90 + Math.random()*90); if (this.failNext > 0){ this.failNext--; throw new ApiFail(500, { code:'UPSTREAM_UNAVAILABLE', message:'The gate did not answer in time. The console is showing the last good response.', requestId:'req_'+Math.random().toString(36).slice(2,10) }); } }
+  async health(){
+    await sleep(50);
+    return { status:this.state.status, version:'0.1.0-mock',
+      recovery:{ complete:this.state.status === 'ok', stranded_resolved:this.state.stranded },
+      rail:'mock', started_at:this.boot };
+  }
+  summaryNow(){
+    const since = Date.now() - 864e5;
+    const win = this.fx.decisions.filter(d => d.created_at >= since);
+    const by = v => win.filter(d => d.verdict === v).length;
+    const l = win.map(d => d.total_latency_ms).sort((a,b)=>a-b);
+    const pct = p => l.length ? l[Math.min(l.length-1, Math.floor(l.length*p))] : 0;
+    return { window:'24h',
+      rupees_prevented_minor: win.filter(d=>d.verdict!=='ALLOW').reduce((s,d)=>s+d.rupees_at_risk_minor,0),
+      rupees_allowed_minor:   win.filter(d=>d.verdict==='ALLOW').reduce((s,d)=>s+d.amount_minor,0),
+      decisions:{ allow:by('ALLOW'), hold:by('HOLD'), block:by('BLOCK'), total:win.length },
+      duplicates_prevented: win.filter(d=>(d.gate_results||[]).some(g=>g.reasons.some(r=>r.code==='ALREADY_APPLIED'))).length,
+      orphans_detected: this.fx.findings.filter(f=>f.kind==='orphan').length,
+      held_open: this.fx.held.filter(h=>h.status==='open').length,
+      quarantined_open: this.fx.quarantine.length,
+      latency_p50_ms: pct(0.5), latency_p99_ms: pct(0.99) };
+  }
+  async summary(){ await this.wait(); return this.summaryNow(); }
+  async decisions(q){
+    await this.wait();
+    const lim = Math.min(Number((q&&q.limit) ?? 50), 200), cur = Number((q&&q.cursor) ?? 0);
+    let rows = this.fx.decisions;
+    ['verdict','agent_id','tool'].forEach(k => { if (q && q[k]) rows = rows.filter(d => d[k] === q[k]); });
+    const page = rows.slice(cur, cur+lim);
+    return { items: page.map(d => { const c = Object.assign({}, d); delete c.gate_results; return c; }),
+      next_cursor: cur+lim < rows.length ? String(cur+lim) : null, total: rows.length };
+  }
+  async decision(id){
+    await this.wait();
+    const d = this.fx.decisions.find(x => x.decision_id === id);
+    if (!d) throw new ApiFail(404, { code:'NOT_FOUND', message:'No such decision', requestId:'req_local' });
+    return d;
+  }
+  async intent(sik){
+    await this.wait();
+    const i = this.fx.intents.get(sik);
+    if (!i) throw new ApiFail(404, { code:'NOT_FOUND', message:'No intent record for this SIK. It was blocked before Gate 4, so no row was ever inserted.', requestId:'req_local' });
+    return i;
+  }
+  async heldList(status){
+    await this.wait();
+    const st = status || 'open';
+    return { items: this.fx.held.filter(h => st === 'all' || h.status === st) };
+  }
+  async resolveHeld(id, action, body){
+    await this.wait();
+    const h = this.fx.held.find(x => x.held_id === id);
+    if (!h) throw new ApiFail(404, { code:'NOT_FOUND', message:'No such held action', requestId:'req_local' });
+    if (h.status !== 'open') throw new ApiFail(409, { code:'ALREADY_RESOLVED', message:'Already '+h.status, requestId:'req_local' });
+    if (!body || !body.approver) throw new ApiFail(422, { code:'VALIDATION_FAILED', message:'approver is required', requestId:'req_local' });
+    h.status = action === 'approve' ? 'approved' : 'denied';
+    h.resolved_by = body.approver; h.resolved_note = body.note || null; h.resolved_at = Date.now();
+    const it = h.sik && this.fx.intents.get(h.sik);
+    if (it && action === 'approve'){
+      it.state = 'AUTHORIZED'; it.updated_at = h.resolved_at;
+      it.transitions.push({ at:h.resolved_at, from:'HELD', to:'AUTHORIZED', event:'human_approve',
+        note:'Approved by '+body.approver+(body.note ? ' — '+body.note : '') });
+    }
+    this.emit('held_resolved', h);
+    this.emit('summary', this.summaryNow());
+    return h;
+  }
+  async quarantine(){ await this.wait(); return { items: this.fx.quarantine.slice() }; }
+  async resolveQuarantine(sik, body){
+    await this.wait();
+    const i = this.fx.quarantine.findIndex(x => x.sik === sik);
+    if (i < 0) throw new ApiFail(404, { code:'NOT_FOUND', message:'No such quarantined intent', requestId:'req_local' });
+    if (!body || ['APPLIED','CONFIRMED_NOT_APPLIED'].indexOf(body.resolution) < 0)
+      throw new ApiFail(422, { code:'VALIDATION_FAILED', message:'resolution must be APPLIED or CONFIRMED_NOT_APPLIED', requestId:'req_local' });
+    if (!body.approver) throw new ApiFail(422, { code:'VALIDATION_FAILED', message:'approver is required', requestId:'req_local' });
+    const q = this.fx.quarantine.splice(i,1)[0];
+    q.state = body.resolution; q.resolved_by = body.approver; q.updated_at = Date.now();
+    const it = this.fx.intents.get(q.sik);
+    if (it){
+      it.state = body.resolution; it.updated_at = q.updated_at;
+      it.transitions.push({ at:q.updated_at, from:'QUARANTINED', to:body.resolution, event:'human_resolve',
+        note:'Resolved by '+body.approver+(body.evidence_url ? ' — evidence '+body.evidence_url : '') });
+    }
+    this.emit('quarantine_resolved', q);
+    this.emit('summary', this.summaryNow());
+    return q;
+  }
+  async agents(){
+    await this.wait();
+    return { items: this.fx.AGENTS.map(a => {
+      const mine = this.fx.decisions.filter(d => d.agent_id === a.agent_id);
+      return Object.assign({}, a, {
+        actions_total: mine.length,
+        rupees_prevented_minor: mine.filter(d=>d.verdict!=='ALLOW').reduce((s,d)=>s+d.rupees_at_risk_minor,0),
+        rupees_allowed_minor:   mine.filter(d=>d.verdict==='ALLOW').reduce((s,d)=>s+d.amount_minor,0),
+        held_open: this.fx.held.filter(h=>h.agent_id===a.agent_id && h.status==='open').length,
+        orphans: this.fx.findings.filter(f=>f.kind==='orphan' && f.agent_id===a.agent_id).length });
+    })};
+  }
+  async findings(kind){ await this.wait(); return { items: kind ? this.fx.findings.filter(f=>f.kind===kind) : this.fx.findings.slice() }; }
+  async mandates(){
+    await this.wait();
+    return { items: this.fx.AGENTS.map(a => ({ mandate_id:a.mandate_id, agent_id:a.agent_id, version:1,
+      mandate_hash:a.mandate_hash, granted_tools:this.fx.TOOLS.slice(0,3),
+      expires_at:new Date(Date.now()+30*864e5).toISOString() })) };
+  }
+  async audit(){ await this.wait(); return { ok:true, checked:1487, first_divergent_seq:null, head_hash:'sha256:1a9f…c204' }; }
+
+  emit(evt, data){ if (this.streamDown) return; this.listeners.forEach(fn => fn(evt, data)); }
+  connect(on){
+    this.listeners.add(on);
+    setTimeout(()=>{ if (!this.streamDown) on('hello', { at:Date.now() }); }, 120);
+    if (!this.timers.length){
+      this.timers.push(setInterval(()=>this.tick(), 3000));
+      this.timers.push(setInterval(()=>this.emit('heartbeat',{ at:Date.now() }), 15000));
+    }
+    const self = this;
+    return { close(){ self.listeners.delete(on); } };
+  }
+  /** the live feed from mock-server.mjs: a decision every 3s so nothing looks static */
+  tick(){
+    if (this.state.status !== 'ok' || this.streamDown) return;
+    const roll = Math.random();
+    const agent = roll > 0.85 ? 'cashflow-agent' : 'support-agent';
+    const tool  = agent === 'cashflow-agent' ? 'create_instant_settlement' : 'create_refund';
+    const amt   = 100000 + Math.floor(Math.random()*900000);
+    let verdict = 'ALLOW', risk = 0, sum = `Refund ₹${(Math.trunc(amt/100)).toLocaleString('en-IN')} on an approved return`;
+    if (roll > 0.94){ verdict='BLOCK'; risk = amt*6; sum = 'Value not authorised by the resolved order'; }
+    else if (roll > 0.88){ verdict='HOLD'; risk = amt; sum = 'Duplicate suspected — declare a distinct reason'; }
+    if (agent === 'cashflow-agent' && verdict === 'ALLOW') sum = `Instant settlement ₹${(Math.trunc(amt/100)).toLocaleString('en-IN')} within the fee budget`;
+    const G = this.fx.G;
+    const d = this.fx.mkDecision({ agent_id:agent, tool, verdict, risk, amount:amt, summary:sum,
+      sik:'ILK'+Math.random().toString(36).slice(2,12).toUpperCase().padEnd(29,'X'),
+      gates:[ G('g1_scope','ALLOW'),
+        G('g2_value', verdict==='BLOCK'?'BLOCK':'ALLOW', verdict==='BLOCK'?'VALUE_NOT_AUTHORISED':null, 'resolved against order'),
+        G('g4_exactly_once', verdict==='HOLD'?'HOLD':'ALLOW', verdict==='HOLD'?'SIK_COLLISION_SUSPECTED':null, 'semantic key check') ]});
+    const row = Object.assign({}, d); delete row.gate_results;
+    this.emit('decision', row);
+    this.emit('summary', this.summaryNow());
+  }
+  /* demo controls — this build ships with the seeded rail */
+  simulateRecovering(sec){
+    this.state = { status:'recovering', stranded:3 };
+    setTimeout(()=>{ this.state = { status:'ok', stranded:3 }; App.refreshHealth(); }, (sec||12)*1000);
+    App.refreshHealth();
+  }
+  dropStream(sec){
+    this.streamDown = true;
+    setTimeout(()=>{ this.streamDown = false; this.listeners.forEach(fn=>fn('hello',{at:Date.now()})); }, (sec||14)*1000);
+  }
+  emptyQueues(){
+    this.fx.held.forEach(h => { if (h.status==='open'){ h.status='approved'; h.resolved_by='arjun@'; h.resolved_at=Date.now(); } });
+    this.fx.quarantine.length = 0;
+    this.fx.findings.length = 0;
+  }
+  resetData(){ this.fx = buildFixtures(); }
+}
+
+/* ───────────────────────────── 4 · app state ───────────────────────────── */
+const S = {
+  gate:null, gateUrl:'', token:'',
+  screen:'decisions', param:null,
+  health:null, summary:null, audit:null,
+  decisions:[], next_cursor:null, total:0,
+  held:[], heldFilter:'open', quarantine:[], agents:[], findings:[], mandates:[],
+  filters:{ verdict:null, agent_id:null, tool:null },
+  sort:{ key:'time', dir:'desc' },
+  drawer:null, drawerData:null,
+  stream:{ status:'connecting', lastAt:0, lastDataAt:0, retries:0, conn:null, timer:null },
+  apiError:null, loading:true, openGates:{}, tlExpanded:false, featured:null
+};
+
+/* toasts — one at a time, never a stream of them */
+let toastTimer = null;
+function toast(msg, bad){
+  const root = $('#toast-root'); if (!root) return;
+  root.innerHTML = `<div class="toast${bad?' bad':''}">${bad?'<span class="dot down"></span>':'<span class="dot live"></span>'}<span>${esc(msg)}</span></div>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ root.innerHTML = ''; }, 4200);
+}
+
+/* ───────────────────────────── 5 · shared pieces ───────────────────────── */
+const chip = v => `<span class="verdict ${v}">${v}</span>`;
+/** Human sentences for the reason codes this build has seen. Unknown codes fall back to
+ *  the gate's own message, so a new backend code degrades to the machine wording, never to nothing. */
+const REASON_COPY = {
+  VALUE_NOT_AUTHORISED:'The refund exceeded the value the resolved order authorised.',
+  ALREADY_APPLIED:'The same semantic action was already applied, and the rail entity for it still exists.',
+  DUPLICATE_IN_PROGRESS:'An identical intent is already in flight. This one attached to it rather than starting a second.',
+  SIK_COLLISION_SUSPECTED:'This looks like a second refund on an action that already ran.',
+  FEE_BUDGET_EXCEEDED:'This action would spend past the fee budget set in the mandate.',
+  STILL_UNKNOWN_AFTER_MAX_ATTEMPTS:'Reconciliation was exhausted without an answer from the rail.',
+  PARAM_DRIFT:'The repeated call carried a different body from the first attempt.',
+  TOOL_NOT_GRANTED:'The mandate does not grant this tool to this agent.',
+  MANDATE_EXPIRED:'The mandate that authorised this agent has expired.'
+};
+const humanReason = (code, message) => REASON_COPY[code] || message || '';
+const token = v => `<span class="vt ${v}">${v}</span>`;
+const agentLabel = id => { const a = S.agents.find(x=>x.agent_id===id) || (S.gate.fx && S.gate.fx.AGENTS.find(x=>x.agent_id===id)); return a ? a.label : id; };
+const humanKey = k => String(k).replace(/_minor$/,'').replace(/_/g,' ');
+
+function fmtLeaf(key, v){
+  const k = String(key);
+  if (typeof v === 'boolean') return String(v);
+  if (typeof v === 'number'){
+    if (/_minor$/.test(k)) return `${v}<span class="fmt">${money(v)}</span>`;
+    if (/(_at|_time)$/.test(k) && v > 1e11) return `${v}<span class="fmt">${clock(v)}</span>`;
+    if (/_ms$/.test(k)) return `${v}<span class="fmt">ms</span>`;
+    return String(v);
+  }
+  return esc(String(v));
+}
+/** evidence is deliberately free-form and differs per gate — render it generically. */
+function kvHTML(obj){
+  const rows = [];
+  const push = (k, html, nest) => rows.push(`<div class="k${nest?' nest':''}">${esc(k)}</div><div class="v">${html}</div>`);
+  const walk = (val, key, nest) => {
+    if (val === null || val === undefined) return push(key, '<span class="nul">null</span>', nest);
+    if (Array.isArray(val)){
+      if (!val.length) return push(key, '<span class="nul">[]</span>', nest);
+      return val.forEach((v,i) => walk(v, key+'['+i+']', nest));
+    }
+    if (typeof val === 'object'){
+      const keys = Object.keys(val);
+      if (!keys.length) return push(key, '<span class="nul">{}</span>', nest);
+      return keys.forEach(k => walk(val[k], key ? key+'.'+k : k, true));
+    }
+    push(key, fmtLeaf(key, val), nest);
+  };
+  if (obj === null || obj === undefined) return '';
+  if (typeof obj !== 'object' || Array.isArray(obj)) walk(obj, 'value', false);
+  else {
+    const keys = Object.keys(obj);
+    if (!keys.length) return '';
+    keys.forEach(k => walk(obj[k], k, false));
+  }
+  return `<div class="kv">${rows.join('')}</div>`;
+}
+/** every *_minor field in any evidence object, wherever it sits. No per-gate knowledge. */
+function minorFields(obj, path, out){
+  out = out || []; path = path || '';
+  if (!obj || typeof obj !== 'object') return out;
+  Object.keys(obj).forEach(k => {
+    const v = obj[k], key = path ? path+'.'+k : k;
+    if (typeof v === 'number' && /_minor$/.test(k)) out.push({ key, value:v });
+    else if (v && typeof v === 'object') minorFields(v, key, out);
+  });
+  return out;
+}
+/** The raw record is the authority. A comparison is drawn only when the pairing is unarguable:
+ *  the evidence holds exactly two amounts, recorded side by side under the same parent, one of them
+ *  exactly what the agent proposed and the other a smaller positive figure. Two fields both ending
+ *  in _minor is never enough on its own — anything looser stays raw key/value. */
+function comparePair(dec, evidence){
+  if (!(dec.amount_minor > 0)) return null;
+  const f = minorFields(evidence);
+  if (f.length !== 2) return null;
+  const parent = k => k.split('.').slice(0,-1).join('.');
+  if (parent(f[0].key) !== parent(f[1].key)) return null;
+  const match = f.find(x => x.value === dec.amount_minor);
+  const other = f.find(x => x !== match);
+  if (!match || !other) return null;
+  if (!(other.value > 0 && other.value < dec.amount_minor)) return null;
+  return { proposed: dec.amount_minor, key: other.key, value: other.value };
+}
+const decisiveGate = d => (d.gate_results || []).find(r => r.verdict !== 'ALLOW') || null;
+function evidenceBlock(obj, label){
+  const head = `<div class="ev-head"><span class="eyebrow">${esc(label||'raw evidence')}</span></div>`;
+  if (obj === null || obj === undefined || (typeof obj === 'object' && !Array.isArray(obj) && !Object.keys(obj).length))
+    return `<div class="ev">${head}<div class="kv"><div class="k">—</div><div class="v"><span class="nul">nothing recorded for this gate</span></div></div></div>`;
+  return `<div class="ev">${head}${kvHTML(obj)}</div>`;
+}
+function emptyBlock(kind){
+  const e = EMPTY[kind];
+  return `<div class="empty"><div class="rule"></div><div class="k">${esc(e.k)}</div><div class="s">${esc(e.s)}</div></div>`;
+}
+function loadingRows(n){
+  return `<div class="feed">${Array.from({length:n||6}).map(()=>'<div class="skel"></div>').join('')}</div>`;
+}
+
+/* ───────────────────────────── 6 · the instrument ──────────────────────── */
+function instrumentHTML(){
+  const s = S.summary;
+  if (!s) return `<section class="instrument"><div class="inst-main"><div class="inst-hero">
+      <div class="eyebrow">prevented from leaving the rail</div><div class="hero-value dim">₹—</div></div>
+      <div class="inst-grid"></div></div></section>`;
+  const d = s.decisions, total = Math.max(1, d.total);
+  const ig = (cls, k, v, sub) => `<div class="ig ${cls}"><div class="eyebrow">${k}</div><div class="ig-v">${v}</div><div class="ig-s">${sub}</div></div>`;
+  const pct = n => (n/total*100).toFixed(2)+'%';
+  return `<section class="instrument" aria-label="Gate telemetry, last 24 hours">
+    <div class="inst-main">
+      <div class="inst-hero">
+        <div class="eyebrow">in the last ${s.window}</div>
+        <div class="hero-value">${money(s.rupees_prevented_minor)}</div>
+        <div class="hero-claim">kept from leaving the rail unchecked</div>
+        <div class="hero-sub">blocked or held before the rail was called <b>·</b> ${money(s.rupees_allowed_minor)} allowed through <b>·</b> ${d.total} actions proposed</div>
+      </div>
+      <div class="inst-grid">
+        ${ig('','decisions', d.total, 'proposed through the proxy')}
+        ${ig('','held open', `<span class="${s.held_open?'v-hold':''}">${s.held_open}</span>`, 'waiting on a human')}
+        ${ig('','quarantined', `<span class="${s.quarantined_open?'v-block':''}">${s.quarantined_open}</span>`, 'ambiguous, never retried')}
+        ${ig('ig-dupes','duplicates prevented', s.duplicates_prevented, 'stopped at gate 4')}
+        ${ig('','orphans', `<span class="${s.orphans_detected?'v-block':''}">${s.orphans_detected}</span>`, 'rail actions with no intent')}
+        ${ig('ig-lat','added latency', `${s.latency_p50_ms} / ${s.latency_p99_ms}<span class="dim" style="font-size:12px"> ms</span>`, 'p50 / p99 per decision')}
+      </div>
+    </div>
+    <div class="inst-bar">
+      <div class="bar" role="img" aria-label="${d.allow} allowed, ${d.hold} held, ${d.block} blocked">
+        <i class="b-allow" style="width:${pct(d.allow)}"></i>
+        <i class="b-hold" style="width:${pct(d.hold)}"></i>
+        <i class="b-block" style="width:${pct(d.block)}"></i>
+      </div>
+      <div class="bar-legend">
+        <span class="v-allow">allow <b>${d.allow}</b></span>
+        <span class="v-hold">hold <b>${d.hold}</b></span>
+        <span class="v-block">block <b>${d.block}</b></span>
+      </div>
+    </div>
+  </section>`;
+}
+
+/** The Interlock path: agent → mandate → ladder → rail → outcome, with the stop marked. */
+function pathStripHTML(d, compact){
+  const dg = decisiveGate(d), g = dg ? GATE_BY_ID[dg.gate] : null, v = d.verdict;
+  const allow = v === 'ALLOW';
+  const state = allow ? 'APPLIED' : v === 'HOLD' ? 'HELD' : 'BLOCKED';
+  const nodes = [
+    { k: d.agent_id, cls:'done' },
+    { k: compact ? 'mandate' : 'mandate ' + String(d.mandate_hash||'').replace('sha256:',''), cls:'done' },
+    { k: g ? (compact ? `gate ${String(g.n).padStart(2,'0')}` : `gate ${String(g.n).padStart(2,'0')} · ${g.name.toLowerCase()}`)
+           : (compact ? 'seven gates' : 'seven deterministic gates'), cls: allow ? 'done on' : 'stop '+v },
+    { k: allow ? 'rail called once' : compact ? 'rail not called' : 'rail never called', cls: allow ? 'done on' : 'never' },
+    { k: compact ? state.toLowerCase() : 'intent ' + state, cls: allow ? 'stop ALLOW on' : 'stop '+v }
+  ];
+  return `<ol class="ipath${compact?' tight':''}" aria-label="Where this action stopped">${nodes.map(n =>
+    `<li class="${n.cls}"><i aria-hidden="true"></i><span>${esc(n.k)}</span></li>`).join('')}</ol>`;
+}
+function featuredCaseHTML(){
+  const d = S.featured;
+  if (!d) return '';
+  const dg = decisiveGate(d), g = dg ? GATE_BY_ID[dg.gate] : null;
+  const r = dg && dg.reasons && dg.reasons[0];
+  const cmp = dg ? comparePair(d, dg.evidence) : null;
+  const hold = d.verdict === 'HOLD';
+  return `<button class="case${hold?' h':''}" data-case="${esc(d.decision_id)}">
+    <div class="case-top">
+      <span class="eyebrow">the case to inspect</span>
+      <span class="go">open the case file <span aria-hidden="true">→</span></span>
+    </div>
+    <div class="case-main">
+      <div class="case-left">
+        <div class="case-verdict ${hold?'v-hold':'v-block'}">${hold?'held':'blocked'}</div>
+        <div class="case-amt">${money(d.amount_minor)}</div>
+        <div class="case-what">${esc(d.tool)}<br>${esc(d.agent_id)} · ${clock(d.created_at)}</div>
+      </div>
+      <div class="case-right">
+        <div class="case-why">${esc(r ? humanReason(r.code, r.message) : d.summary)}</div>
+        <div class="case-codes">
+          ${r ? `<span class="code">${esc(r.code)}</span>` : ''}
+          ${g ? `<span class="eyebrow">gate ${String(g.n).padStart(2,'0')} · ${esc(g.name)}</span>` : ''}
+        </div>
+        ${cmp ? `<div class="case-cmp">
+          <div class="hi"><div class="k">agent proposed</div><div class="v">${money(cmp.proposed)}</div></div>
+          <div class="op">exceeds</div>
+          <div><div class="k">rail-resolved<br>${esc(humanKey(cmp.key))}</div><div class="v">${money(cmp.value)}</div></div>
+        </div>` : ''}
+      </div>
+    </div>
+    <div class="case-path">${pathStripHTML(d)}</div>
+  </button>`;
+}
+
+/* ───────────────────────────── 7 · decision feed ───────────────────────── */
+const CONSEQUENCE = {
+  BLOCK: d => ({ label:'stopped at the gate', line:`${money(d.rupees_at_risk_minor || d.amount_minor)} did not leave the rail` }),
+  HOLD:  d => ({ label:'held for a human',    line:'nothing has touched the rail; the intent is waiting, not failed' })
+};
+function decisionRowHTML(d, isNew){
+  const tier2 = d.verdict !== 'ALLOW';
+  const risk = d.verdict === 'ALLOW'
+    ? '<span class="r-risk" title="Nothing at risk — not applicable">—</span>'
+    : `<span class="r-risk">${money(d.rupees_at_risk_minor)}</span>`;
+  const c = tier2 ? CONSEQUENCE[d.verdict](d) : null;
+  return `<button class="row v-${d.verdict}${tier2?' tier2':''}${isNew?' enter':''}" role="row"
+      data-id="${esc(d.decision_id)}" aria-selected="${S.drawer===d.decision_id}">
+    <span class="r-time">${clock(d.created_at)}</span>
+    <span class="r-verdict">${tier2 ? chip(d.verdict) : token(d.verdict)}</span>
+    <span class="r-tool">${esc(d.tool)}</span>
+    <span class="r-agent">${esc(agentLabel(d.agent_id))}</span>
+    <span class="r-sum">${esc(d.summary)}</span>
+    <span class="r-amt">${money(d.amount_minor)}</span>
+    ${risk}
+    <span class="r-lat">${d.total_latency_ms}ms</span>
+    <span class="r-meta">${clock(d.created_at)} · ${esc(d.tool)} · ${esc(d.agent_id)}</span>
+    ${c ? `<span class="r-note"><span>${esc(c.label)}</span><em>${esc(c.line)}</em></span>` : ''}
+  </button>`;
+}
+function sortedDecisions(){
+  const rows = S.decisions.slice();
+  if (S.sort.key === 'risk') rows.sort((a,b)=> (b.rupees_at_risk_minor - a.rupees_at_risk_minor) || (b.created_at - a.created_at));
+  else rows.sort((a,b)=> b.created_at - a.created_at);
+  return rows;
+}
+function screenDecisions(){
+  const f = S.filters;
+  const rows = sortedDecisions();
+  const tools = (S.gate.fx ? S.gate.fx.TOOLS : ['create_refund','create_payment_link','create_instant_settlement','fetch_payment','fetch_order']);
+  const agents = S.agents.length ? S.agents : (S.gate.fx ? S.gate.fx.AGENTS : []);
+  const feed = S.loading ? loadingRows(8) : (!rows.length ? emptyBlock('decisions') : `
+    <div class="feed">
+      <div class="feed-head" role="row">
+        <span><button data-sort="time" data-active="${S.sort.key==='time'?1:0}">time</button></span>
+        <span>verdict</span><span class="r-tool">tool</span><span class="r-agent">agent</span><span>proposed action</span>
+        <span class="r">amount</span>
+        <span class="r"><button data-sort="risk" data-active="${S.sort.key==='risk'?1:0}">at risk</button></span>
+        <span class="r r-lat">added</span>
+      </div>
+      <div class="rows" id="rows" role="rowgroup">${rows.map(d=>decisionRowHTML(d,false)).join('')}</div>
+      <div class="feed-foot">
+        <span class="live-pill" id="foot-live"></span>
+        ${S.next_cursor ? '<button class="btn sm" id="more">Load older</button>' : ''}
+        <span class="n">${rows.length} of ${S.total} · ${S.sort.key==='risk'?'ranked by value at risk':'newest first'}</span>
+      </div>
+    </div>`);
+  return `${instrumentHTML()}
+    ${S.loading ? '' : featuredCaseHTML()}
+    <div class="filterbar" style="margin-top:20px">
+      <div class="seg" role="group" aria-label="Filter by verdict">
+        <button data-verdict="" aria-pressed="${!f.verdict}">All</button>
+        <button data-verdict="ALLOW" data-v="ALLOW" aria-pressed="${f.verdict==='ALLOW'}">Allow</button>
+        <button data-verdict="HOLD" data-v="HOLD" aria-pressed="${f.verdict==='HOLD'}">Hold</button>
+        <button data-verdict="BLOCK" data-v="BLOCK" aria-pressed="${f.verdict==='BLOCK'}">Block</button>
+      </div>
+      <div class="fdiv"></div>
+      <div class="selwrap"><label class="sr" for="f-agent">Filter by agent</label>
+        <select class="ctl" id="f-agent"><option value="">all agents</option>
+          ${agents.map(a=>`<option value="${esc(a.agent_id)}"${f.agent_id===a.agent_id?' selected':''}>${esc(a.agent_id)}</option>`).join('')}</select></div>
+      <div class="fdiv"></div>
+      <div class="selwrap"><label class="sr" for="f-tool">Filter by tool</label>
+        <select class="ctl" id="f-tool"><option value="">all tools</option>
+          ${tools.map(t=>`<option value="${esc(t)}"${f.tool===t?' selected':''}>${esc(t)}</option>`).join('')}</select></div>
+      <div class="tail">${f.verdict||f.agent_id||f.tool ? '<button class="linkbtn" id="clearf">clear filters</button>' : '<span>click any row for the gate-by-gate record</span>'}</div>
+    </div>
+    ${feed}`;
+}
+
+/* ───────────────────────────── 8 · held ────────────────────────────────── */
+function heldCardHTML(h){
+  const open = h.status === 'open';
+  const approver = ls.get('interlock.approver') || '';
+  return `<article class="card held${open?'':' done'}" data-held="${esc(h.held_id)}">
+    <div class="held-band">
+      <div>
+        <div class="eyebrow">nothing has touched the rail</div>
+        <div class="held-amt">${money(h.amount_minor)}</div>
+        <div class="held-what">${esc(h.tool)} · ${esc(h.agent_id)}${h.sik?' · '+esc(short(h.sik,12)):''}</div>
+      </div>
+      <div class="held-side">
+        ${open ? chip('HOLD') : `<span class="verdict ${h.status==='approved'?'ALLOW':'BLOCK'}">${h.status.toUpperCase()}</span>`}
+        <span class="held-age">held ${ago(h.created_at)}</span>
+      </div>
+    </div>
+    <div class="held-reason">
+      <p class="reason-h">${esc(humanReason(h.reason_code, h.reason))}</p>
+      <div class="reason-m"><span class="code">${esc(h.reason_code)}</span><span>${esc(h.reason)}</span></div>
+    </div>
+    <div class="held-ev">${evidenceBlock(h.evidence, 'raw evidence resolved at the gate')}</div>
+    ${open ? `
+      <div class="control">
+        <div class="fields">
+          <div class="f"><label for="ap-${esc(h.held_id)}">Approver</label>
+            <input class="ctl mono" id="ap-${esc(h.held_id)}" data-approver placeholder="arjun@" value="${esc(approver)}" autocomplete="off"></div>
+          <div class="f wide"><label for="nt-${esc(h.held_id)}">Note</label>
+            <input class="ctl" id="nt-${esc(h.held_id)}" data-note placeholder="optional — recorded in the audit chain" autocomplete="off"></div>
+        </div>
+        <div class="acts">
+          <button class="btn danger" data-act="deny">Deny</button>
+          <button class="btn primary" data-act="approve">Approve</button>
+        </div>
+        <div class="control-note">Approving moves this intent to AUTHORIZED; the write-ahead record is fsynced before any call reaches the rail.
+          Denying is terminal. Either way the approver is written into the audit chain.${h.sik ? ' ' : ''}
+          ${h.sik ? `<button class="linkbtn" data-sik="${esc(h.sik)}">intent timeline</button>` : ''}</div>
+      </div>` : `
+      <div class="resolved">
+        <span>${h.status === 'approved' ? 'Approved' : 'Denied'} by <span class="mono">${esc(h.resolved_by||'—')}</span>${h.resolved_at?' · '+ago(h.resolved_at)+' ago':''}</span>
+        ${h.resolved_note ? `<span class="dim">“${esc(h.resolved_note)}”</span>` : ''}
+        ${h.sik ? `<button class="linkbtn" data-sik="${esc(h.sik)}" style="margin-left:auto">intent timeline</button>` : ''}
+      </div>`}
+  </article>`;
+}
+function screenHeld(){
+  const items = S.held.slice().filter(h => S.heldFilter === 'all' || h.status === S.heldFilter).sort((a,b)=>a.created_at-b.created_at);
+  const openCount = S.held.filter(h=>h.status==='open').length;
+  return `<div class="screen-head"><div class="hd">
+      <h1>The system stopped here because it needs a human</h1>
+      <p>Held actions are deliberate uncertainty, not failures. Nothing on this page has touched the rail, and nothing
+         here resolves itself with time.</p>
+    </div></div>
+    <div class="filterbar">
+      <div class="seg" role="group" aria-label="Filter held actions">
+        <button data-held-filter="open" aria-pressed="${S.heldFilter==='open'}">Open${openCount?' · '+openCount:''}</button>
+        <button data-held-filter="approved" aria-pressed="${S.heldFilter==='approved'}">Approved</button>
+        <button data-held-filter="denied" aria-pressed="${S.heldFilter==='denied'}">Denied</button>
+        <button data-held-filter="all" aria-pressed="${S.heldFilter==='all'}">All</button>
+      </div>
+      <div class="tail"><span>oldest first</span></div>
+    </div>
+    ${S.loading ? loadingRows(2) : (items.length ? `<div class="cards">${items.map(heldCardHTML).join('')}</div>` : emptyBlock('held'))}`;
+}
+
+/* ───────────────────────────── 9 · quarantine ──────────────────────────── */
+function quarantineCardHTML(q){
+  return `<article class="card" data-quar="${esc(q.sik)}">
+    <div class="held-band">
+      <div>
+        <div class="eyebrow">the system does not know what happened</div>
+        <div class="held-amt">${money(q.amount_minor)}</div>
+        <div class="held-what">${esc(q.tool)} · ${esc(q.agent_id)} · ${esc(q.sik)}</div>
+      </div>
+      <div class="held-side">
+        <span class="verdict BLOCK">${esc(q.state)}</span>
+        <span class="held-age">${q.reconcile_attempts} reconcile passes · attempt ${q.attempt_seq}</span>
+      </div>
+    </div>
+    <div class="held-reason">
+      <p class="reason-h">${esc(humanReason(q.reason_code, q.reason))}</p>
+      <div class="reason-m"><span class="code">${esc(q.reason_code)}</span><span>${esc(q.reason)}</span></div>
+    </div>
+    <div class="consequence">
+      <div><div class="c-k">If it did apply and you record it as not applied</div>
+        <div class="c-v">A second <b>${esc(q.tool)}</b> runs on the same subject. The customer is paid <b>${money(q.amount_minor)}</b> twice.</div></div>
+      <div><div class="c-k">If it did not apply and you record it as applied</div>
+        <div class="c-v">The intent goes terminal and no retry follows. The customer is stranded and never receives <b>${money(q.amount_minor)}</b>.</div></div>
+    </div>
+    <div class="control">
+      <div class="control-note" style="grid-column:1;align-self:center;margin:0">
+        Six automated passes could not tell these two apart. Check the rail yourself before choosing.
+        <button class="linkbtn" data-sik="${esc(q.sik)}">open the intent timeline</button>
+      </div>
+      <div class="acts">
+        <button class="btn" data-resolve="CONFIRMED_NOT_APPLIED">Confirm not applied</button>
+        <button class="btn" data-resolve="APPLIED">Resolve as applied</button>
+      </div>
+    </div>
+  </article>`;
+}
+function screenQuarantine(){
+  return `<div class="screen-head"><div class="hd">
+      <h1>Quarantine</h1>
+      <p>Intents the rail left genuinely ambiguous after the maximum reconcile passes. Interlock never retries them on its own,
+         because the safe-looking guess is the one that pays twice.</p>
+    </div></div>
+    ${S.loading ? loadingRows(2) : (S.quarantine.length ? `<div class="cards">${S.quarantine.map(quarantineCardHTML).join('')}</div>` : emptyBlock('quarantine'))}`;
+}
+
+/* ───────────────────────────── 10 · agents ─────────────────────────────── */
+function agentCardHTML(a){
+  const mandate = S.mandates.find(m=>m.agent_id===a.agent_id);
+  return `<article class="card">
+    <div class="agent-head">
+      <div class="lbl">${esc(a.label)}</div>
+      <div class="id">${esc(a.agent_id)} · ${esc(a.mandate_id)} · ${esc(a.mandate_hash)}${mandate?' · '+mandate.granted_tools.length+' tools granted':''}</div>
+    </div>
+    <div class="agent-stats">
+      <div><div class="k">Blocked or held</div><div class="v">${money(a.rupees_prevented_minor)}</div></div>
+      <div><div class="k">Allowed through</div><div class="v">${money(a.rupees_allowed_minor)}</div></div>
+      <div><div class="k">Actions</div><div class="v">${a.actions_total}</div></div>
+    </div>
+    <div class="callout">
+      <span class="dot ${a.held_open?'warn':'live'}" style="margin-top:6px"></span>
+      <div>${a.held_open ? `${a.held_open} action${a.held_open>1?'s':''} from this agent ${a.held_open>1?'are':'is'} waiting on a human.` : 'Nothing from this agent is waiting on a human.'}
+        ${a.orphans ? `<b class="v-block">${a.orphans} orphan${a.orphans>1?'s':''} attributed to this agent.</b>` : 'Every rail entity carrying its mandate hash matched an intent record in the last sweep.'}</div>
+    </div>
+  </article>`;
+}
+function orphanCalloutHTML(){
+  const orphans = S.findings.filter(f => f.kind === 'orphan');
+  if (!orphans.length) return '';
+  const total = orphans.reduce((n,f)=>n+f.amount_minor,0);
+  return `<div class="orphan">
+    <div>
+      <div class="eyebrow k">orphan detected</div>
+      <div class="amt">${money(total)}</div>
+    </div>
+    <div>
+      <div style="font-size:14.5px">A rail action exists with no corresponding Interlock intent.</div>
+      <p>${orphans.length === 1 ? 'One refund' : orphans.length+' rail entities'} moved money without passing through the gate —
+        <b>${esc(orphans.map(o=>o.rail_entity_id||o.sik||'unidentified').join(', '))}</b>.
+        Interlock can only prove what it decided, so it counts what it did not. A coverage gap that is reported is a gap you can close.</p>
+    </div>
+  </div>`;
+}
+function findingRowHTML(f){
+  const tone = f.kind === 'orphan' ? 'v-block' : f.kind === 'phantom' ? 'v-hold' : 'v-block';
+  return `<div class="finding">
+    <span class="kind ${tone}">${esc(f.kind)}</span>
+    <span class="detail">${esc(f.detail)}</span>
+    <span class="m">${money(f.amount_minor)}</span>
+    <span class="e">${esc(f.rail_entity_id || f.sik || '—')}</span>
+  </div>`;
+}
+function screenAgents(){
+  return `<div class="screen-head"><div class="hd">
+      <h1>Agents</h1>
+      <p>What each agent has been allowed to move, what the gate stopped or held before the rail was called,
+         and where the gate can see that it was bypassed.</p>
+    </div></div>
+    ${S.loading ? loadingRows(3) : `
+      ${orphanCalloutHTML()}
+      <div class="agent-grid">${S.agents.map(agentCardHTML).join('')}</div>
+      <div style="margin-top:22px">
+        <div class="section-label eyebrow">reconciliation sweep</div>
+        ${S.findings.length ? `<div style="border-top:1px solid var(--hair)">${S.findings.map(findingRowHTML).join('')}</div>` : emptyBlock('findings')}
+      </div>`}`;
+}
+
+/* ───────────────────────────── 11 · forensic replay ────────────────────── */
+/** the distinct states this intent passed through, with reconcile loops collapsed */
+function statePath(transitions){
+  const seq = [];
+  transitions.forEach(t => { if (!seq.length || seq[seq.length-1] !== t.to) seq.push(t.to); });
+  const out = [];
+  for (let i=0;i<seq.length;i++){
+    if (i+3 < seq.length && seq[i] === seq[i+2] && seq[i+1] === seq[i+3]){
+      const a = seq[i], b = seq[i+1]; let n = 0, j = i;
+      while (j+1 < seq.length && seq[j] === a && seq[j+1] === b){ n++; j += 2; }
+      out.push({ loop:[a,b], n }); i = j-1;
+    } else out.push({ state:seq[i] });
+  }
+  return out;
+}
+function pathHTML(intent){
+  const tone = s => STATE_TONE[s] === 'good' ? 'good' : STATE_TONE[s] === 'warn' ? 'warn' : STATE_TONE[s] === 'bad' ? 'bad' : '';
+  const st = (s, now) => `<span class="p-state ${tone(s)}${now?' now':''}">${esc(s)}</span>`;
+  const parts = [];
+  statePath(intent.transitions).forEach((p,i) => {
+    if (i) parts.push('<span class="p-arrow">→</span>');
+    if (p.loop) parts.push(`${st(p.loop[0])}<span class="p-arrow">⇄</span>${st(p.loop[1])}<span class="p-loop">×${p.n}</span>`);
+    else parts.push(st(p.state, p.state === intent.state));
+  });
+  return `<div class="path">${parts.join('')}</div>`;
+}
+function timelineHTML(intent){
+  const t = intent.transitions;
+  const seenMeaning = {};
+  // a long reconcile cycle is evidence, not noise — keep the ends, fold the middle
+  const pairs = t.map(x => x.from + '>' + x.to);
+  const counts = {}; pairs.forEach(k => counts[k] = (counts[k]||0)+1);
+  const repeated = pairs.map(k => counts[k] >= 3);
+  let a = repeated.indexOf(true), b = repeated.lastIndexOf(true);
+  let foldFrom = -1, foldTo = -1;
+  if (a > -1 && b - a >= 5 && repeated.slice(a,b+1).every(Boolean)){ foldFrom = a+2; foldTo = b-2; }
+  const out = [];
+  for (let i=0;i<t.length;i++){
+    if (!S.tlExpanded && foldFrom > -1 && i === foldFrom){
+      const n = foldTo - foldFrom + 1;
+      out.push(`<button class="tl-fold" data-tl-expand><b>${n} further passes</b>
+        <span>every one inconclusive — the rail never completed a page, so absence was never proven</span>
+        <span class="go">show all</span></button>`);
+    }
+    if (!S.tlExpanded && foldFrom > -1 && i >= foldFrom && i <= foldTo) continue;
+    const x = t[i];
+    const key = KEY_TRANSITIONS.has(`${x.from}>${x.to}`);
+    const tone = STATE_TONE[x.to] || '';
+    const shape = TERMINAL_STATES.has(x.to) ? ' terminal' : x.to === 'UNKNOWN' ? ' unsure' : '';
+    const meaning = seenMeaning[x.to] ? '' : (STATE_MEANING[x.to] ? ' · ' + STATE_MEANING[x.to] : '');
+    seenMeaning[x.to] = 1;
+    const brk = x.event === 'recovered'
+      ? `<div class="tl-break"><div class="rule"><b>process terminated</b></div>
+          <span>The durable intent survived. The process did not — the row was already fsynced to disk when the gate died.</span></div>`
+      : '';
+    out.push(`${brk}<div class="tlrow ${tone?'s-'+tone:''}${key?' key':''}${shape}">
+      <div class="tl-top">
+        ${x.from ? `<span class="tl-from">${esc(x.from)} →</span>` : ''}
+        <span class="tl-state ${tone==='good'?'v-allow':tone==='warn'?'v-hold':tone==='bad'?'v-block':''}">${esc(x.to)}</span>
+        <span class="tl-at">${clock(x.at)}</span>
+      </div>
+      <div class="tl-note">${esc(x.note)}</div>
+      <div class="tl-ev">${esc(x.event)}${esc(meaning)}</div>
+    </div>`);
+  }
+  return out.join('');
+}
+function attemptsHTML(intent){
+  if (!intent.attempts.length) return '<p class="muted" style="font-size:13px">No rail attempt was ever started for this intent.</p>';
+  return `<div class="attempts">
+    <div class="h">seq</div><div class="h">started</div><div class="h">finished</div><div class="h">outcome</div><div class="h">http</div><div class="h">rail error</div>
+    ${intent.attempts.map(a=>`
+      <div>${a.attempt_seq}</div>
+      <div>${clock(a.started_at)}</div>
+      <div>${a.finished_at ? clock(a.finished_at) : '<span class="dim">—</span>'}</div>
+      <div class="${a.outcome==='APPLIED'?'v-allow':a.outcome==='UNKNOWN'?'v-hold':a.outcome?'v-block':''}">${a.outcome || '<span class="dim">in progress</span>'}</div>
+      <div>${a.http_status ?? '<span class="dim">—</span>'}</div>
+      <div>${a.rail_error_code ? esc(a.rail_error_code) : '<span class="dim">—</span>'}</div>`).join('')}
+  </div>`;
+}
+const TERMINAL_STATES = new Set(['APPLIED','CONFIRMED_NOT_APPLIED','FAILED_TERMINAL','QUARANTINED','BLOCKED']);
+const LEGEND = [
+  ['UNKNOWN','warn','da','We do not know yet. The call went out; no answer came back. Nothing is ever retried from here.'],
+  ['RECONCILING','warn','','We are asking the rail. Absence only counts once the pages run out.'],
+  ['FAILED_TERMINAL','bad','sq','We know. The rail refused deterministically, nothing was applied, and the engine will not reopen it.'],
+  ['QUARANTINED','bad','sq','We stopped asking. Six passes, no answer, so a named human decides instead of a retry.']
+];
+function screenIntent(){
+  const i = S.intentData;
+  if (S.loading) return loadingRows(6);
+  if (!i) return `<div class="empty"><div class="rule" style="background:var(--dim)"></div>
+    <div class="k">No intent record for this SIK.</div>
+    <div class="s">${esc(S.intentError || 'The action was blocked before Gate 4, so no row was ever inserted. That is the correct outcome, not missing data.')}</div>
+    <div style="margin-top:18px"><button class="btn sm" data-back>Back to decisions</button></div></div>`;
+  const tone = STATE_TONE[i.state];
+  return `<div class="screen-head">
+      <div class="hd">
+        <div class="eyebrow">semantic idempotency key</div>
+        <h1 style="font-family:var(--mono);font-size:15px;letter-spacing:.01em;margin-top:8px;word-break:break-all">${esc(i.sik)}</h1>
+        <p style="margin-top:10px">One semantic action, tracked from proposal to settled outcome.
+          ${esc(((STATE_MEANING[i.state]||'').charAt(0).toUpperCase()+(STATE_MEANING[i.state]||'').slice(1))+(STATE_MEANING[i.state]?'.':''))}</p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="verdict lg ${tone==='good'?'ALLOW':tone==='warn'?'HOLD':tone==='bad'?'BLOCK':'off'}">${esc(i.state)}</span>
+        <button class="btn sm" data-back>Back</button>
+      </div>
+    </div>
+    <div style="margin-bottom:26px">
+      <div class="facts">
+        <div class="fact"><div class="k">Amount</div><div class="v big">${money(i.amount_minor)}</div></div>
+        <div class="fact"><div class="k">Reversibility</div><div class="v big">${esc(i.reversibility)}</div></div>
+        <div class="fact"><div class="k">Tool · agent</div><div class="v">${esc(i.tool)} · ${esc(i.agent_id)}</div></div>
+        <div class="fact"><div class="k">Subject</div><div class="v">${esc(i.subject_id)}</div></div>
+        <div class="fact"><div class="k">Attempt sequence</div><div class="v">${i.attempt_seq}</div></div>
+        <div class="fact"><div class="k">Reconcile attempts</div><div class="v ${i.reconcile_attempts?'v-hold':''}">${i.reconcile_attempts}</div></div>
+        <div class="fact"><div class="k">Rail entity</div><div class="v">${i.rail_entity_id ? esc(i.rail_entity_id) : '<span class="dim">none — nothing was applied</span>'}</div></div>
+        <div class="fact"><div class="k">Mandate</div><div class="v">${esc(i.mandate_hash)}</div></div>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--hair);padding-top:20px">
+      <div class="section-label eyebrow">state path</div>
+      ${pathHTML(i)}
+      <div class="section-label eyebrow">${i.transitions.length} transitions · first seen ${clock(i.first_seen_at)}</div>
+      <div class="tl">${timelineHTML(i)}</div>
+    </div>
+    <div class="legend">${LEGEND.map(([k,t,shape,txt])=>`<div>
+      <div class="l-k ${t==='warn'?'v-hold':'v-block'}"><i class="${shape}" aria-hidden="true"></i>${k}</div>
+      <div class="l-s">${esc(txt)}</div></div>`).join('')}</div>
+    <div style="margin-top:28px">
+      <div class="section-label eyebrow">rail attempts</div>
+      ${attemptsHTML(i)}
+    </div>`;
+}
+
+/* ───────────────────────────── 12 · gate ladder + drawer ───────────────── */
+/** Only drawn when the relationship is unambiguous — see comparePair. */
+function compareStrip(dec, r){
+  const c = comparePair(dec, r.evidence);
+  if (!c) return '';
+  const h = dec.verdict === 'HOLD';
+  return `<div class="compare${h?' h':''}">
+    <div class="eyebrow">the two amounts in the record below</div>
+    <div class="compare-grid" style="margin-top:12px">
+      <div class="compare-cell hi"><div class="k">agent proposed</div><div class="v">${money(c.proposed)}</div></div>
+      <div class="compare-op">exceeds</div>
+      <div class="compare-cell"><div class="k">rail-resolved ${esc(humanKey(c.key))}</div><div class="v">${money(c.value)}</div></div>
+    </div>
+    <p class="compare-note">Interlock resolved that second figure from the rail itself, over its own read-only client.
+      The amount that arrived in the agent's arguments was never treated as authority.</p>
+  </div>`;
+}
+function ladderHTML(dec, noAnim){
+  const results = dec.gate_results || [];
+  const byId = {}; results.forEach(r => byId[r.gate] = r);
+  const reached = results.reduce((m,r)=> Math.max(m, (GATE_BY_ID[r.gate]||{n:0}).n), 0);
+  return `<div class="gp">` + GATES.map(g => {
+    const r = byId[g.id];
+    const isModel = g.kind === 'model';
+    const decisive = !!(r && r.verdict !== 'ALLOW');
+    const open = S.openGates[g.id] != null ? S.openGates[g.id] : decisive;
+    let cls = '', right, body;
+    if (r){
+      cls = decisive ? ' evaluated decisive' + (r.verdict === 'HOLD' ? ' h' : '') : ' evaluated';
+      right = decisive
+        ? `${chip(r.verdict)}<span class="gate-lat">${r.latency_ms}ms</span>`
+        : `<span class="gate-state v-allow">passed</span><span class="gate-lat">${r.latency_ms}ms</span>`;
+      const first = (r.reasons||[])[0];
+      const human = decisive && first ? `<div class="reason-h">${esc(humanReason(first.code, first.message))}</div>` : '';
+      const machine = (r.reasons||[]).map(x =>
+        `<div class="reason-m"><span class="code">${esc(x.code)}</span><span>${esc(x.message)}</span></div>`).join('');
+      const cmp = decisive ? compareStrip(dec, r) : '';
+      body = `${human}${cmp}
+        ${decisive && human ? '' : `<div class="gate-desc">${esc(g.desc)}</div>`}${machine}
+        ${r.evidence != null ? `<div class="raw-cap">${evidenceBlock(r.evidence, 'raw evidence, as the gate recorded it')}</div>` : ''}`;
+    } else {
+      const notReached = g.n > reached;
+      cls = isModel ? ' model skipped' : ' skipped';
+      right = `<span class="gate-state">${isModel ? 'model · off by default' : notReached ? 'not reached' : 'not run'}</span>`;
+      const because = isModel
+        ? 'Gate 5 is opt-in and off unless --purpose-check is passed. With it off the ladder contains no model at all, and the money path is deterministic end to end. A model gate cannot express ALLOW — the verdict type has no such member.'
+        : notReached
+          ? (dec.verdict === 'BLOCK' ? 'The ladder stopped at the decisive gate above. BLOCK is absorbing — nothing after it evaluated this action.'
+            : dec.verdict === 'HOLD' ? 'The action was held before this gate ran. It runs if a human approves.'
+            : 'Not recorded on this decision.')
+          : 'Not run for this action.';
+      body = `<div class="gate-desc">${esc(because)}</div><div class="gate-desc dim">${esc(g.desc)}</div>`;
+    }
+    return `<div class="gate${cls}" data-gate="${g.id}" data-open="${open?1:0}" style="${noAnim?'animation:none':'animation-delay:'+(g.n*28)+'ms'}">
+      <button class="gate-top" data-toggle-gate="${g.id}" aria-expanded="${open?'true':'false'}">
+        <span class="gate-n">${String(g.n).padStart(2,'0')}</span>
+        <span class="gate-name">${esc(g.name)}${isModel?'':'<span class="gate-kind">deterministic</span>'}</span>
+        <span class="gate-right">${right}
+          <svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </button>
+      ${open ? `<div class="gate-body">${body}</div>` : ''}
+    </div>`;
+  }).join('') + `</div>`;
+}
+const VERDICT_WORD = { ALLOW:'Allowed', HOLD:'Held', BLOCK:'Blocked' };
+function consequenceLine(d){
+  const decisive = (d.gate_results||[]).find(r => r.verdict !== 'ALLOW');
+  const g = decisive ? GATE_BY_ID[decisive.gate] : null;
+  const where = g ? `Gate ${String(g.n).padStart(2,'0')} — ${g.name} — ` : '';
+  if (d.verdict === 'BLOCK')
+    return `${money(d.rupees_at_risk_minor || d.amount_minor)} did not leave the rail. ${where}stopped it, and the ladder went no further.`;
+  if (d.verdict === 'HOLD')
+    return `Nothing has been sent to the rail. ${where}will not decide this alone, so the intent is waiting on a named human.`;
+  return `Cleared every deterministic gate in ${d.total_latency_ms}ms. The intent was written and fsynced before the call went out.`;
+}
+function drawerHTML(){
+  const d = S.drawerData;
+  if (!d) return `<div class="dr-head"><div class="eyebrow">loading decision</div>
+    <div class="dr-verdict dim">—</div></div><div class="dr-body">${loadingRows(4)}</div>`;
+  const vclass = d.verdict === 'ALLOW' ? 'v-allow' : d.verdict === 'HOLD' ? 'v-hold' : 'v-block';
+  return `<div class="dr-head">
+      <button class="iconbtn dr-close" data-close aria-label="Close decision">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </button>
+      <div class="dr-eyebrow"><span class="eyebrow">decision <span class="raw">${esc(d.decision_id)}</span></span>
+        <span class="eyebrow">${clock(d.created_at)}</span><span class="eyebrow">${d.total_latency_ms}ms added</span></div>
+      <div class="dr-verdict ${vclass}">${VERDICT_WORD[d.verdict]}</div>
+      <div class="dr-amount">${money(d.amount_minor)}</div>
+      <p class="dr-consequence">${esc(consequenceLine(d))}</p>
+      <div style="margin-top:16px;overflow-x:auto">${pathStripHTML(d, true)}</div>
+    </div>
+    <div class="dr-body">
+      <div class="dr-sect">
+        <h3 class="eyebrow">the action</h3>
+        <div class="facts">
+          <div class="fact"><div class="k">Tool</div><div class="v">${esc(d.tool)}</div></div>
+          <div class="fact"><div class="k">Agent</div><div class="v">${esc(d.agent_id)}</div></div>
+          <div class="fact"><div class="k">Rupees at risk</div><div class="v ${d.verdict==='ALLOW'?'':vclass}">${d.verdict==='ALLOW'?'<span class="dim">— nothing at risk</span>':money(d.rupees_at_risk_minor)}</div></div>
+          <div class="fact"><div class="k">Mandate</div><div class="v">${esc(d.mandate_hash)}</div></div>
+          <div class="fact" style="grid-column:1/-1;border-right:0;padding-right:0"><div class="k">Semantic idempotency key</div>
+            <div class="v">${d.sik ? esc(d.sik) : '<span class="dim">none — blocked before Gate 4, so no intent row was ever inserted</span>'}</div></div>
+        </div>
+      </div>
+      <div class="dr-sect">
+        <h3 class="eyebrow">gate path<span class="hint">a gate can only ever lower the verdict</span></h3>
+        ${ladderHTML(d)}
+      </div>
+      <div class="dr-sect" style="border-bottom:0;padding-top:4px">
+        ${d.sik ? `<button class="next" data-sik="${esc(d.sik)}">
+            <span class="k">next</span>
+            <span>Open the intent timeline</span>
+            <span class="sik">${esc(short(d.sik,16))} →</span></button>`
+          : `<p class="gate-desc">No intent timeline exists for this decision. The ladder stopped before Gate 4, which is where the
+             intent row is inserted — so nothing was ever written and nothing could have reached the rail.</p>`}
+        <p class="gate-desc" style="margin-top:14px">Every gate above stored the evidence it resolved, so
+          <span class="mono" style="font-size:12px">interlock replay ${esc(d.decision_id)}</span> reproduces this verdict bit-for-bit
+          without touching the rail again.</p>
+      </div>
+    </div>`;
+}
+function openDrawer(id){
+  S.drawer = id; S.drawerData = null; S.openGates = {};
+  let root = $('#drawer-root');
+  root.innerHTML = `<div class="scrim" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Decision detail">${drawerHTML()}</aside>`;
+  requestAnimationFrame(()=>{ $('.scrim').classList.add('on'); $('.drawer').classList.add('on'); });
+  trapFocus($('.drawer'));
+  $$('.row').forEach(r => r.setAttribute('aria-selected', r.dataset.id === id));
+  S.gate.decision(id).then(d => {
+    if (S.drawer !== id) return;
+    S.drawerData = d;
+    const el = $('.drawer'); if (el) el.innerHTML = drawerHTML();
+    const c = $('.drawer [data-close]'); if (c) c.focus();
+  }).catch(e => { closeDrawer(); showApiError(e); });
+}
+function closeDrawer(){
+  S.drawer = null; S.drawerData = null;
+  const d = $('.drawer'), s = $('.scrim');
+  if (d) d.classList.remove('on'); if (s) s.classList.remove('on');
+  setTimeout(()=>{ const r = $('#drawer-root'); if (r) r.innerHTML = ''; }, 180);
+  releaseFocus();
+  $$('.row').forEach(r => r.setAttribute('aria-selected','false'));
+  if (location.hash.indexOf('#/decisions/') === 0) history.replaceState(null,'','#/decisions');
+}
+
+/* ───────────────────────────── 13 · modal ──────────────────────────────── */
+let modalPrev = null;
+function openModal(html){
+  modalPrev = document.activeElement;
+  $('#modal-root').innerHTML = `<div class="modal"><div class="scrim on" data-mclose></div><div class="modal-card" role="dialog" aria-modal="true">${html}</div></div>`;
+  trapFocus($('.modal-card'));
+  const f = $('.modal-card input, .modal-card button'); if (f) f.focus();
+}
+function closeModal(){
+  $('#modal-root').innerHTML = ''; releaseFocus();
+  if (modalPrev && modalPrev.focus) modalPrev.focus();
+}
+function quarantineModal(sik, resolution){
+  const q = S.quarantine.find(x => x.sik === sik); if (!q) return;
+  const applied = resolution === 'APPLIED';
+  openModal(`
+    <div class="modal-head">
+      <div class="eyebrow">highest-consequence action in the product</div>
+      <h2>${applied ? 'Record this intent as applied' : 'Confirm this intent was not applied'}</h2>
+      <p>${applied
+        ? 'You are telling Interlock the rail did move this money. The intent becomes terminal and will never be retried.'
+        : 'You are telling Interlock the rail did not move this money. The intent becomes eligible for one fresh attempt under the same key.'}</p>
+    </div>
+    <div class="modal-body">
+      <div class="warnbox">
+        <b>${money(q.amount_minor)} · ${esc(q.tool)} · ${esc(q.agent_id)}</b>
+        <ul>
+          <li>Marking it applied when it was not strands the customer — the refund never arrives and no retry follows.</li>
+          <li>Marking it not applied when it was pays twice — a second ${esc(q.tool)} on the same subject.</li>
+          <li>Check the rail yourself before you decide. Six automated passes could not.</li>
+        </ul>
+      </div>
+      <div class="facts">
+        <div class="fact"><div class="k">SIK</div><div class="v">${esc(q.sik)}</div></div>
+        <div class="fact"><div class="k">Reason</div><div class="v" style="font-family:var(--sans)">${esc(q.reason)}</div></div>
+        <div class="fact"><div class="k">Reconcile attempts</div><div class="v">${q.reconcile_attempts}</div></div>
+        <div class="fact"><div class="k">First seen</div><div class="v">${stamp(q.first_seen_at)} ${clock(q.first_seen_at)}</div></div>
+      </div>
+      <div class="field"><label for="q-approver">Approver</label>
+        <input id="q-approver" class="mono" placeholder="arjun@" autocomplete="off" value="${esc(ls.get('interlock.approver')||'')}"></div>
+      <div class="field"><label for="q-ev">Evidence URL (optional)</label>
+        <input id="q-ev" class="mono" placeholder="https://dashboard…/refunds/rfnd_…" autocomplete="off"></div>
+      <label class="confirm"><input type="checkbox" id="q-ack">
+        <span>I have checked the rail myself and I am recording what it actually shows.</span></label>
+      <div class="err mono" id="q-err" style="color:var(--block);font-size:12.5px" hidden></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-mclose>Cancel</button>
+      <button class="btn danger" id="q-go" disabled>${applied ? 'Record as applied' : 'Record as not applied'}</button>
+    </div>`);
+  const ack = $('#q-ack'), go = $('#q-go');
+  ack.addEventListener('change', ()=>{ go.disabled = !ack.checked; });
+  go.addEventListener('click', async ()=>{
+    const approver = $('#q-approver').value.trim(), url = $('#q-ev').value.trim();
+    const err = $('#q-err');
+    if (!approver){ err.hidden = false; err.textContent = 'approver is required'; $('#q-approver').focus(); return; }
+    ls.set('interlock.approver', approver);
+    go.disabled = true; go.textContent = 'recording…';
+    try {
+      const body = { resolution, approver }; if (url) body.evidence_url = url;
+      const q2 = await S.gate.resolveQuarantine(sik, body);
+      applyQuarantineResolved(q2);
+      closeModal();
+      toast(`${short(sik,8)} recorded as ${resolution}. Audit entry written against ${approver}.`);
+    } catch(e){
+      go.disabled = false; go.textContent = applied ? 'Record as applied' : 'Record as not applied';
+      err.hidden = false; err.textContent = e.message + (e.requestId ? ' · ' + e.requestId : '');
     }
   });
 }
 
-document.addEventListener('click', (e) => {
-  const button = e.target.closest('button[data-op]');
-  if (button) openForm(button);
+/* ───────────────────────────── 14 · focus handling ─────────────────────── */
+let trapEl = null, trapHandler = null;
+function trapFocus(el){
+  releaseFocus();
+  trapEl = el;
+  trapHandler = (e) => {
+    if (e.key !== 'Tab' || !trapEl) return;
+    const f = $$('a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])', trapEl)
+      .filter(n => n.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length-1];
+    if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+  };
+  document.addEventListener('keydown', trapHandler);
+}
+function releaseFocus(){ if (trapHandler) document.removeEventListener('keydown', trapHandler); trapEl = null; trapHandler = null; }
+
+/* ───────────────────────────── 15 · banners + errors ───────────────────── */
+function showApiError(e){
+  S.apiError = { message: e.message || 'Request failed', code: e.code, requestId: e.requestId, at: Date.now() };
+  renderBanners();
+}
+function renderBanners(){
+  const out = [];
+  const h = S.health;
+  if (h && h.status === 'recovering'){
+    const n = (h.recovery && h.recovery.stranded_resolved) || 0;
+    out.push(`<div class="banner warn"><span class="dot warn pulse"></span><div class="b-body">
+      <b>Gate is recovering.</b> Reconciling ${n} intent${n===1?'':'s'} that were in flight when the gate restarted.
+      Decisions resume when this completes.</div></div>`);
+  }
+  if (S.stream.status === 'down'){
+    const t = S.stream.lastDataAt || S.stream.lastAt;
+    out.push(`<div class="banner warn"><span class="dot down"></span><div class="b-body">
+      <b>Stream disconnected.</b> Showing stale data from ${t?clock(t):'—'} · reconnecting${S.stream.retries?' (attempt '+S.stream.retries+')':''}…</div></div>`);
+  }
+  if (S.apiError){
+    out.push(`<div class="banner bad"><span class="dot down"></span><div class="b-body">
+      <b>${esc(S.apiError.message)}</b>
+      <details><summary>technical detail</summary><p>code ${esc(S.apiError.code||'—')} · requestId ${esc(S.apiError.requestId||'none')} · ${clock(S.apiError.at)}</p></details>
+      </div><button class="iconbtn" data-dismiss-error aria-label="Dismiss">×</button></div>`);
+  }
+  $('#banners').innerHTML = out.join('');
+}
+
+/* ───────────────────────────── 16 · stream ─────────────────────────────── */
+function setStream(status){
+  if (S.stream.status === status) return;
+  S.stream.status = status;
+  paintStreamChip(); renderBanners();
+}
+function paintStreamChip(){
+  const dot = $('#stream-dot'), st = $('#stream-state'), age = $('#stream-age');
+  if (!dot) return;
+  const map = { live:['live pulse','live'], connecting:['warn','connecting'], down:['down','disconnected'] };
+  const m = map[S.stream.status] || map.connecting;
+  dot.className = 'dot ' + m[0];
+  st.textContent = m[1];
+  age.textContent = S.stream.lastAt ? ' · ' + ago(S.stream.lastAt) : '';
+  const foot = $('#foot-live');
+  if (foot) foot.innerHTML = `<span class="dot ${m[0]}"></span>${S.stream.status==='live'?'live — decisions stream in as they are proposed':m[1]}`;
+}
+function connectStream(){
+  if (S.stream.conn) S.stream.conn.close();
+  setStream('connecting');
+  S.stream.conn = S.gate.connect((evt, data) => {
+    S.stream.lastAt = Date.now();
+    if (evt === '__error'){
+      setStream('down');
+      S.stream.retries++;
+      const wait = Math.min(30000, Math.pow(2, S.stream.retries) * 1000);
+      setTimeout(()=>{ if (S.stream.status === 'down') connectStream(); }, wait);
+      return;
+    }
+    if (evt === '__open' || evt === 'hello'){ S.stream.retries = 0; setStream('live'); return; }
+    if (evt === 'heartbeat'){ setStream('live'); return; }
+    S.stream.lastDataAt = Date.now();
+    setStream('live');
+    onStreamData(evt, data);
+  });
+}
+function onStreamData(evt, data){
+  switch(evt){
+    case 'decision': {
+      S.decisions.unshift(data);
+      if (S.decisions.length > 500) S.decisions.pop();
+      S.total++;
+      if (S.screen === 'decisions' && S.sort.key === 'time' && matchesFilters(data)){
+        const box = $('#rows');
+        if (box){
+          box.insertAdjacentHTML('afterbegin', decisionRowHTML(data, true));
+          const rows = $$('.row', box);
+          if (rows.length > 120) rows[rows.length-1].remove();
+        } else render();
+      }
+      break;
+    }
+    case 'summary': {
+      S.summary = data;
+      const t = $('.instrument');
+      if (t && S.screen === 'decisions') t.outerHTML = instrumentHTML();
+      paintCounts();
+      break;
+    }
+    case 'held':
+      if (!S.held.some(h => h.held_id === data.held_id)) S.held.unshift(data);
+      paintCounts(); if (S.screen === 'held') render();
+      break;
+    case 'held_resolved':
+      applyHeld(data, true);
+      break;
+    case 'quarantine':
+      if (!S.quarantine.some(q => q.sik === data.sik)) S.quarantine.push(data);
+      paintCounts(); if (S.screen === 'quarantine') render();
+      break;
+    case 'quarantine_resolved':
+      applyQuarantineResolved(data, true);
+      break;
+    case 'finding':
+      if (!S.findings.some(f => f.finding_id === data.finding_id)) S.findings.unshift(data);
+      if (S.screen === 'agents') render();
+      break;
+  }
+}
+function matchesFilters(d){
+  const f = S.filters;
+  return (!f.verdict || d.verdict === f.verdict) && (!f.agent_id || d.agent_id === f.agent_id) && (!f.tool || d.tool === f.tool);
+}
+/** replace by id — the POST response and the SSE event must not both apply */
+function applyHeld(h, fromStream){
+  const i = S.held.findIndex(x => x.held_id === h.held_id);
+  if (i >= 0){
+    if (fromStream && S.held[i].status === h.status && S.held[i].resolved_at === h.resolved_at) return;
+    S.held[i] = h;
+  } else S.held.unshift(h);
+  paintCounts();
+  if (S.screen === 'held') render();
+}
+function applyQuarantineResolved(q, fromStream){
+  const before = S.quarantine.length;
+  S.quarantine = S.quarantine.filter(x => x.sik !== q.sik);
+  paintCounts();
+  if (S.screen === 'quarantine' && (before !== S.quarantine.length || !fromStream)) render();
+}
+
+/* ───────────────────────────── 17 · chrome ─────────────────────────────── */
+const SCREEN_LABEL = { decisions:'Decisions', held:'Held', quarantine:'Quarantine', agents:'Agents', intent:'Intent' };
+function paintCounts(){
+  const openHeld = S.held.filter(h=>h.status==='open').length;
+  const q = S.quarantine.length;
+  const ch = $('#cnt-held'), cq = $('#cnt-quar');
+  if (ch){ ch.textContent = openHeld; ch.className = 'count' + (openHeld ? ' hot' : ''); }
+  if (cq){ cq.textContent = q; cq.className = 'count' + (q ? ' crit' : ''); }
+}
+function paintChrome(){
+  $$('.tab').forEach(t => t.setAttribute('aria-current', t.dataset.screen === S.screen ? 'page' : 'false'));
+  const nb = $('#navbtn-label'); if (nb) nb.textContent = SCREEN_LABEL[S.screen] || 'Console';
+  const rail = $('#rail-name'), rdot = $('#rail-dot');
+  if (rail && S.health){
+    rail.textContent = S.health.rail;
+    rdot.className = 'dot ' + (S.health.status === 'ok' ? 'live' : 'warn');
+  }
+  paintCounts();
+}
+function renderAudit(){
+  const bar = $('#auditbar'); if (!bar) return;
+  const a = S.audit;
+  if (!a){ bar.innerHTML = '<span class="dot"></span><span>audit chain — checking</span>'; return; }
+  bar.innerHTML = a.ok
+    ? `<span class="dot live"></span><span class="ok">audit verified</span>
+       <span class="sep">/</span><span class="n-records">${a.checked.toLocaleString('en-IN')} records</span>
+       <span class="sep">/</span><span class="hash">head ${esc(a.head_hash)}</span>
+       <span class="right">interlock verify</span>`
+    : `<span class="dot down"></span><span class="v-block">audit chain diverges at seq ${a.first_divergent_seq}</span>
+       <span class="sep">/</span><span class="n-records">${a.checked.toLocaleString('en-IN')} records checked</span>
+       <span class="right hash">head ${esc(a.head_hash)}</span>`;
+}
+function render(){
+  const view = $('#view'); if (!view) return;
+  if (S.screen === 'held') view.innerHTML = screenHeld();
+  else if (S.screen === 'quarantine') view.innerHTML = screenQuarantine();
+  else if (S.screen === 'agents') view.innerHTML = screenAgents();
+  else if (S.screen === 'intent') view.innerHTML = screenIntent();
+  else view.innerHTML = screenDecisions();
+  paintChrome(); paintStreamChip();
+}
+
+/* ───────────────────────────── 18 · loading ────────────────────────────── */
+function fatal(e){
+  if (e && e.status === 401){ showTokenScreen('The gate rejected that token.'); return true; }
+  showApiError(e); return false;
+}
+async function loadSummary(){ try { S.summary = await S.gate.summary(); } catch(e){ fatal(e); } }
+/** The case worth inspecting: the largest value the gate actually stopped, blocks before holds.
+ *  Rows carry no gate_results by contract, so the featured case fetches that one detail. */
+function pickFeatured(rows){
+  const blocks = rows.filter(d => d.verdict === 'BLOCK');
+  const pool = blocks.length ? blocks : rows.filter(d => d.verdict === 'HOLD');
+  if (!pool.length) return null;
+  return pool.reduce((m,d) => (d.rupees_at_risk_minor > m.rupees_at_risk_minor ? d : m), pool[0]);
+}
+async function loadFeatured(){
+  const pick = pickFeatured(S.decisions);
+  if (!pick){ S.featured = null; return; }
+  if (S.featured && S.featured.decision_id === pick.decision_id) return;
+  try { S.featured = await S.gate.decision(pick.decision_id); }
+  catch(e){ S.featured = null; }
+}
+async function loadDecisions(){
+  S.loading = true; render();
+  try {
+    const p = await S.gate.decisions(Object.assign({ limit:50 }, S.filters));
+    S.decisions = p.items; S.next_cursor = p.next_cursor; S.total = p.total;
+    S.apiError = null; renderBanners();
+  } catch(e){ fatal(e); }
+  await loadFeatured();
+  S.loading = false; render();
+}
+async function loadMore(){
+  const btn = $('#more'); if (btn){ btn.disabled = true; btn.textContent = 'loading…'; }
+  try {
+    const p = await S.gate.decisions(Object.assign({ limit:50, cursor:S.next_cursor }, S.filters));
+    const seen = new Set(S.decisions.map(d=>d.decision_id));
+    S.decisions = S.decisions.concat(p.items.filter(d=>!seen.has(d.decision_id)));
+    S.next_cursor = p.next_cursor; S.total = p.total;
+  } catch(e){ fatal(e); }
+  render();
+}
+async function loadHeld(){ try { const r = await S.gate.heldList('all'); S.held = r.items; } catch(e){ fatal(e); } }
+async function loadQuarantine(){ try { const r = await S.gate.quarantine(); S.quarantine = r.items; } catch(e){ fatal(e); } }
+async function loadAgents(){
+  try {
+    const [a,f,m] = await Promise.all([S.gate.agents(), S.gate.findings(), S.gate.mandates()]);
+    S.agents = a.items; S.findings = f.items; S.mandates = m.items;
+  } catch(e){ fatal(e); }
+}
+async function loadAudit(){ try { S.audit = await S.gate.audit(); renderAudit(); } catch(e){ /* audit is not load-bearing */ } }
+async function loadIntent(sik){
+  S.loading = true; S.intentData = null; S.intentError = null; render();
+  try { S.intentData = await S.gate.intent(sik); }
+  catch(e){ if (e.status === 401) return fatal(e); S.intentError = e.message; }
+  S.loading = false; render();
+}
+
+/* ───────────────────────────── 19 · routing ────────────────────────────── */
+function go(hash){ if (location.hash === hash) route(); else location.hash = hash; }
+function route(){
+  const raw = (location.hash || '#/decisions').replace(/^#\/?/,'');
+  const [head, param] = raw.split('/');
+  const screen = ['decisions','held','quarantine','agents','intent'].indexOf(head) >= 0 ? head : 'decisions';
+  const changed = screen !== S.screen;
+  S.screen = screen; S.param = param ? decodeURIComponent(param) : null;
+  closePop();
+  if (screen !== 'decisions' && S.drawer) closeDrawer();
+
+  if (screen === 'intent'){ render(); if (S.param) loadIntent(S.param); return; }
+  render();
+  if (screen === 'decisions'){
+    if (S.param && S.param !== S.drawer) openDrawer(S.param);
+    if (!S.param && S.drawer) closeDrawer();
+  }
+  if (screen === 'held' && changed) loadHeld().then(()=>render());
+  if (screen === 'quarantine' && changed) loadQuarantine().then(()=>render());
+  if (screen === 'agents' && changed) loadAgents().then(()=>render());
+}
+
+/* ───────────────────────────── 20 · popovers ───────────────────────────── */
+function closePop(){
+  $('#pop-root').innerHTML = '';
+  const s = $('#sysbtn'), n = $('#navbtn');
+  if (s) s.setAttribute('aria-expanded','false');
+  if (n) n.setAttribute('aria-expanded','false');
+}
+function openNavPop(){
+  const items = [['decisions','Decisions',''],['held','Held',S.held.filter(h=>h.status==='open').length],
+                 ['quarantine','Quarantine',S.quarantine.length],['agents','Agents','']];
+  $('#pop-root').innerHTML = `<div class="pop navpop" role="menu">${items.map(([k,label,count])=>`
+    <button class="navitem" role="menuitem" data-screen="${k}" aria-current="${S.screen===k?'page':'false'}">${label}
+      ${count!=='' ? `<span class="count${count?(k==='quarantine'?' crit':' hot'):''}">${count}</span>` : ''}</button>`).join('')}</div>`;
+  $('#navbtn').setAttribute('aria-expanded','true');
+}
+function openSysPop(){
+  const h = S.health || {}, local = S.gate.kind === 'local';
+  const up = h.started_at ? ago(h.started_at) : '—';
+  $('#pop-root').innerHTML = `<div class="pop" role="dialog" aria-label="System status">
+    <h3>Gate</h3>
+    <div style="padding:6px 0 0">
+      <div class="rowline"><span>Status</span><span class="v ${h.status==='ok'?'v-allow':'v-hold'}">${esc(h.status||'—')}</span></div>
+      <div class="rowline"><span>Rail</span><span class="v">${esc(h.rail||'—')}</span></div>
+      <div class="rowline"><span>Version</span><span class="v">${esc(h.version||'—')}</span></div>
+      <div class="rowline"><span>Up</span><span class="v">${up}</span></div>
+      <div class="rowline"><span>Endpoint</span><span class="v">${local ? 'seeded rail, in-browser' : esc(S.gateUrl)}</span></div>
+      <div class="rowline"><span>Token</span><span class="v">${local ? 'not required' : esc((S.token||'').slice(0,3)+'••••')}</span></div>
+      <div class="rowline"><span>Audit head</span><span class="v">${S.audit?esc(S.audit.head_hash):'—'}</span></div>
+    </div>
+    ${local ? `<h3 style="padding-top:12px">Operational states</h3>
+      <div class="actions">
+        <button class="btn sm" data-demo="recover">Restart the gate</button>
+        <button class="btn sm" data-demo="drop">Drop the stream</button>
+        <button class="btn sm" data-demo="fail">Fail the next request</button>
+        <button class="btn sm" data-demo="empty">Empty the queues</button>
+        <button class="btn sm" data-demo="reset">Reset seeded data</button>
+      </div>` : ''}
+    <div class="actions">
+      <button class="btn sm" data-demo="token">${local ? 'Connect to a gate' : 'Change token'}</button>
+    </div>
+    <div class="note">Interlock is what you put between an AI agent and a payment API so that the agent cannot pay twice,
+      and cannot pay more than you authorised.${local ? ' This console is running against the seeded mock rail — every figure on screen comes from those fixtures.' : ''}</div>
+  </div>`;
+  $('#sysbtn').setAttribute('aria-expanded','true');
+}
+
+/* ───────────────────────────── 21 · held actions ───────────────────────── */
+async function resolveHeld(heldId, action, btn){
+  const card = btn.closest('[data-held]');
+  const approverEl = $('[data-approver]', card), noteEl = $('[data-note]', card);
+  const approver = approverEl.value.trim(), note = noteEl.value.trim();
+  if (!approver){ approverEl.focus(); toast('An approver is required. The audit record needs a name.', true); return; }
+  ls.set('interlock.approver', approver);
+  $$('button', card).forEach(b => b.disabled = true);
+  card.style.opacity = '.55';
+  try {
+    const h = await S.gate.resolveHeld(heldId, action, note ? { approver, note } : { approver });
+    applyHeld(h);
+    toast(action === 'approve'
+      ? `Approved by ${approver}. The intent moves to AUTHORIZED and is written before any call.`
+      : `Denied by ${approver}. Terminal — the rail was never touched.`);
+  } catch(e){
+    card.style.opacity = '';
+    $$('button', card).forEach(b => b.disabled = false);
+    if (e.status === 409){ toast('Already resolved by someone else. Refreshing the queue.', true); await loadHeld(); render(); }
+    else { showApiError(e); toast(e.message, true); }
+  }
+}
+
+/* ───────────────────────────── 22 · events ─────────────────────────────── */
+document.addEventListener('click', async (e) => {
+  const t = e.target;
+  const hit = sel => t.closest(sel);
+
+  if (hit('[data-screen]')){ go('#/' + hit('[data-screen]').dataset.screen); return; }
+  if (hit('[data-close]')){ closeDrawer(); return; }
+  if (hit('[data-mclose]')){ closeModal(); return; }
+  if (hit('[data-dismiss-error]')){ S.apiError = null; renderBanners(); return; }
+  if (hit('[data-back]')){ history.length > 1 ? history.back() : go('#/decisions'); return; }
+  if (hit('[data-sik]')){ go('#/intent/' + encodeURIComponent(hit('[data-sik]').dataset.sik)); return; }
+  if (hit('[data-toggle-gate]')){
+    const id = hit('[data-toggle-gate]').dataset.toggleGate;
+    const box = $(`.gate[data-gate="${id}"]`);
+    if (!box || !S.drawerData) return;
+    S.openGates[id] = box.dataset.open !== '1';
+    const gp = $('.drawer .gp');
+    if (gp) gp.outerHTML = ladderHTML(S.drawerData, true);
+    const again = $(`.gate[data-gate="${id}"] .gate-top`);
+    if (again) again.focus();
+    return;
+  }
+  if (hit('[data-case]')){ const id = hit('[data-case]').dataset.case; go('#/decisions/' + id); if (S.drawer !== id) openDrawer(id); return; }
+  if (hit('.row')){ const id = hit('.row').dataset.id; go('#/decisions/' + id); if (S.drawer !== id) openDrawer(id); return; }
+  if (hit('[data-verdict]')){ S.filters.verdict = hit('[data-verdict]').dataset.verdict || null; loadDecisions(); return; }
+  if (hit('#clearf')){ S.filters = { verdict:null, agent_id:null, tool:null }; loadDecisions(); return; }
+  if (hit('[data-tl-expand]')){ S.tlExpanded = true; render(); return; }
+  if (hit('[data-sort]')){ S.sort.key = hit('[data-sort]').dataset.sort; render(); return; }
+  if (hit('#more')){ loadMore(); return; }
+  if (hit('[data-held-filter]')){ S.heldFilter = hit('[data-held-filter]').dataset.heldFilter; render(); return; }
+  if (hit('[data-act]')){ resolveHeld(hit('[data-held]').dataset.held, hit('[data-act]').dataset.act, t); return; }
+  if (hit('[data-resolve]')){ quarantineModal(hit('[data-quar]').dataset.quar, hit('[data-resolve]').dataset.resolve); return; }
+
+  if (hit('#sysbtn')){ const open = $('#sysbtn').getAttribute('aria-expanded') === 'true'; closePop(); if (!open) openSysPop(); return; }
+  if (hit('#navbtn')){ const open = $('#navbtn').getAttribute('aria-expanded') === 'true'; closePop(); if (!open) openNavPop(); return; }
+  if (hit('[data-demo]')){
+    const what = hit('[data-demo]').dataset.demo; closePop();
+    const g = S.gate;
+    if (what === 'recover'){ g.simulateRecovering(12); toast('Gate restarted. Recovery runs for about 12 seconds.'); }
+    if (what === 'drop'){ g.dropStream(14); setStream('down'); toast('Stream dropped. The console keeps the last good data on screen.'); }
+    if (what === 'fail'){ g.failNext = 1; toast('The next request will fail. Change a filter to see the error state.'); }
+    if (what === 'empty'){ g.emptyQueues(); await Promise.all([loadHeld(), loadQuarantine(), loadAgents(), loadSummary()]); render(); toast('Queues cleared.'); }
+    if (what === 'reset'){ g.resetData(); await Promise.all([loadHeld(), loadQuarantine(), loadAgents(), loadSummary()]); loadDecisions(); toast('Seeded data restored.'); }
+    if (what === 'token'){ showTokenScreen(); }
+    return;
+  }
+  if (!hit('.pop')) closePop();
 });
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'f-agent'){ S.filters.agent_id = e.target.value || null; loadDecisions(); }
+  if (e.target.id === 'f-tool'){ S.filters.tool = e.target.value || null; loadDecisions(); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape'){
+    if ($('.modal')) return closeModal();
+    if ($('.drawer')) return closeDrawer();
+    if ($('.pop')) return closePop();
+  }
+});
+window.addEventListener('hashchange', route);
 
-async function refresh() {
-  await health();
-  try {
-    kpis(await api('/api/summary'));
-    await queues();
-    await decisions();
-    $('clock').textContent = 'updated ' + new Date().toLocaleTimeString('en-IN', { hour12: false });
-  } catch { /* lock() has already run, or the gate is briefly down */ }
+/* ───────────────────────────── 23 · token screen ───────────────────────── */
+function showTokenScreen(err){
+  $('#app').hidden = true;
+  const ts = $('#token-screen'); ts.hidden = false;
+  $('#token-gate').textContent = S.gateUrl || 'none — the seeded demo rail runs in this page';
+  const gi = $('#gate-input'); if (gi) gi.value = S.gateUrl || '';
+  const e = $('#token-err');
+  if (err){ e.hidden = false; e.textContent = err; } else e.hidden = true;
+  const i = $('#token-input'); i.value = ''; i.focus();
+  if (S.stream.conn){ S.stream.conn.close(); S.stream.conn = null; }
 }
+function hideTokenScreen(){ $('#token-screen').hidden = true; $('#app').hidden = false; }
 
-function lock(message) {
-  TOKEN = '';
-  sessionStorage.removeItem('interlock_token');
-  if (source) { source.close(); source = null; }
-  $('gate').style.display = 'flex';
-  $('gate-err').textContent = message || '';
+/* ───────────────────────────── 24 · boot ───────────────────────────────── */
+const App = {
+  async refreshHealth(){
+    try { S.health = await S.gate.health(); } catch(e){}
+    renderBanners(); paintChrome();
+  }
+};
+async function start(gate){
+  S.gate = gate;
+  hideTokenScreen();
+  renderBanners(); paintStreamChip();
+  await App.refreshHealth();
+  await Promise.all([loadSummary(), loadHeld(), loadQuarantine(), loadAgents()]);
+  loadAudit();
+  paintCounts();
+  route();
+  await loadDecisions();
+  connectStream();
+  clearInterval(App._t);
+  App._t = setInterval(() => {
+    paintStreamChip();
+    if (S.stream.status === 'live' && S.stream.lastAt && Date.now() - S.stream.lastAt > 45000) setStream('down');
+    if (S.gate.kind === 'local' && S.health && S.health.status !== (S.gate.state||{}).status) App.refreshHealth();
+  }, 5000);
 }
-
-async function unlock() {
-  const value = $('token').value.trim();
-  if (value === '') return;
-  TOKEN = value;
-  try {
-    await api('/api/summary');
-  } catch { return; }
-  sessionStorage.setItem('interlock_token', value);
-  $('gate').style.display = 'none';
-  $('token').value = '';
-  await refresh();
-  stream();
+function boot(){
+  const qs = new URLSearchParams(location.search);
+  const url = qs.get('gate') || ls.get('interlock.gate_url') || window.INTERLOCK_GATE_URL || '';
+  const token = qs.get('token') || ls.get('interlock.token') || '';
+  S.gateUrl = url; S.token = token;
+  if (url && token) return start(new RemoteGate(url, token));
+  if (url && !token) return showTokenScreen('This gate needs a console token.');
+  start(new LocalGate());
 }
-
-$('unlock').addEventListener('click', () => void unlock());
-$('token').addEventListener('keydown', (e) => { if (e.key === 'Enter') void unlock(); });
-$('lock').addEventListener('click', () => lock(''));
-
-if (TOKEN) { $('gate').style.display = 'none'; void refresh().then(stream); }
-setInterval(() => void health(), 5000);
+$('#token-save').addEventListener('click', () => {
+  const token = $('#token-input').value.trim();
+  const gi = $('#gate-input');
+  const url = gi ? gi.value.trim() : S.gateUrl;
+  if (!token){ $('#token-err').hidden = false; $('#token-err').textContent = 'A token is required.'; return; }
+  if (!url){ $('#token-err').hidden = false; $('#token-err').textContent = 'A gate URL is required — or open the seeded demo.'; return; }
+  ls.set('interlock.token', token); ls.set('interlock.gate_url', url);
+  S.token = token; S.gateUrl = url;
+  start(new RemoteGate(url, token));
+});
+$('#token-demo').addEventListener('click', () => {
+  ls.del('interlock.token'); ls.del('interlock.gate_url');
+  S.token = ''; S.gateUrl = '';
+  start(new LocalGate());
+});
+$('#token-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('#token-save').click(); });
+boot();
 </script>
 </body>
 </html>

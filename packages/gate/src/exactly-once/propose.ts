@@ -142,6 +142,45 @@ function assertNever(state: never): never {
  * I1 is upheld by the INSERT failing, not by checking first and then inserting,
  * which would have a window between the check and the write.
  */
+/**
+ * Write down that a duplicate was refused.
+ *
+ * This is the event the whole system exists to produce, and until this
+ * function existed it left no trace at all: the second identical request found
+ * the intent already APPLIED, returned the original entity, and wrote nothing.
+ * The ledger recorded one refund and one decision, which is correct, and
+ * recorded nowhere that a second one had been asked for and stopped.
+ *
+ * That makes the most valuable fact in the system uncountable — you cannot
+ * report it, alert on it, or prove it to anyone afterwards. Absorbing a
+ * duplicate silently and never absorbing one look identical from outside.
+ *
+ * Not a state change: the intent does not move, so I6 is untouched. This is an
+ * observation appended beside the transitions, the way DECISION_RECORDED is.
+ */
+function recordAbsorbed(store: Store, input: NewIntent, result: ProposeResult): void {
+  const { disposition } = result;
+  if (disposition.kind !== 'BLOCK') return;
+  if (disposition.reason !== 'ALREADY_APPLIED' && disposition.reason !== 'ALREADY_BLOCKED') return;
+
+  store.audit.append({
+    kind: 'DUPLICATE_ABSORBED',
+    ts: input.at,
+    payload: {
+      merchant_id: input.merchant_id,
+      sik: input.sik,
+      tool: input.tool,
+      subject_id: input.subject_id,
+      amount_minor: input.amount_minor,
+      currency: input.currency,
+      reason: disposition.reason,
+      // What the caller gets instead of a second movement of money.
+      rail_entity_id: disposition.rail_entity_id,
+      first_seen_at: result.intent.first_seen_at,
+    },
+  });
+}
+
 export function propose(store: Store, input: NewIntent): ProposeResult {
   for (let race = 0; race < MAX_RACES; race += 1) {
     try {
@@ -154,7 +193,9 @@ export function propose(store: Store, input: NewIntent): ProposeResult {
 
       const existing = store.intents.require(input.merchant_id, input.sik);
       try {
-        return dispositionFor(store, existing, input.at);
+        const result = dispositionFor(store, existing, input.at);
+        recordAbsorbed(store, input, result);
+        return result;
       } catch (raced) {
         // Another writer moved the row between our read and our transition.
         // Re-read rather than assume; assuming here is how money moves twice.
