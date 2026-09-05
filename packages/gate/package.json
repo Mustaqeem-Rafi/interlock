@@ -13,7 +13,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "console.html"
   ],
   "scripts": {
     "build": "tsc --build",

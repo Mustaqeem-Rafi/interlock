@@ -83,6 +83,8 @@ for (const name of BINARIES) {
 }
 
 copyFileSync(join(REPO, 'packages', 'store', 'schema.sql'), join(OUT, 'schema.sql'));
+// The console page, resolved by the server at ../console.html from the bundle.
+copyFileSync(join(REPO, 'packages', 'gate', 'console.html'), join(OUT, 'console.html'));
 copyFileSync(join(REPO, 'README.md'), join(OUT, 'README.md'));
 copyFileSync(join(REPO, 'LICENSE'), join(OUT, 'LICENSE'));
 copyFileSync(join(REPO, 'examples', 'mandate.yaml'), join(OUT, 'examples', 'mandate.yaml'));
