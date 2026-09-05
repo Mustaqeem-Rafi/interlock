@@ -23,7 +23,9 @@ export type InterlockErrorCode =
   | 'RAIL_UNAVAILABLE'
   | 'RAIL_DUPLICATE_RECEIPT'
   | 'RAIL_NOT_FOUND'
-  | 'RAIL_REJECTED';
+  | 'RAIL_REJECTED'
+  | 'CHAOS_CONFIG'
+  | 'CHAOS_TRIAL_FAILED';
 
 export abstract class InterlockError extends Error {
   abstract readonly code: InterlockErrorCode;

@@ -25,7 +25,9 @@ export type {
   MockFeeModel,
   MockRail,
   MockRailInspector,
+  MockRailJournalEvent,
   MockRailOptions,
+  MockRailSnapshot,
   SeedOrderInput,
   SeedPaymentInput,
 } from './mock.js';

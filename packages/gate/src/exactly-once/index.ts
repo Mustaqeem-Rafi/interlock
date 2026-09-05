@@ -8,6 +8,7 @@ export {
   nextState,
 } from './machine.js';
 export type { MachineEvent } from './machine.js';
+export type { IntentState } from '@interlock/core';
 
 export { LEASE_MS, assertStamped, createWal, stampRefund } from './wal.js';
 export type { IssueOutcome, RefundOrder, Wal, WalOptions } from './wal.js';

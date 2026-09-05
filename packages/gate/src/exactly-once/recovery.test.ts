@@ -199,13 +199,31 @@ describe('boot recovery', () => {
     });
   });
 
-  it('leaves a live lease alone', async () => {
+  it('leaves a live lease alone in sweep mode, where other work may hold it', async () => {
     await strandInFlight(1, true);
     clock = T0 + 1_000; // lease still has 29 seconds
 
-    const report = await createRecovery({ store, reconciler, now: () => clock }).run();
+    const report = await createRecovery({
+      store,
+      reconciler,
+      now: () => clock,
+      reclaim: 'expired',
+    }).run();
     expect(report.recovered).toBe(0);
     expect(store.intents.require(MERCHANT, sikFor(1)).state).toBe('IN_FLIGHT');
+  });
+
+  it('reclaims a lease with time left on it, because on boot nobody holds it', async () => {
+    // A process that crashed two seconds ago still has 28 seconds of lease. If
+    // boot recovery waited for that, the restart would serve traffic with an
+    // IN_FLIGHT row unaccounted for — the exact window it exists to close.
+    await strandInFlight(1, true);
+    clock = T0 + 2_000;
+
+    const report = await createRecovery({ store, reconciler, now: () => clock }).run();
+    expect(report.recovered).toBe(1);
+    expect(store.intents.require(MERCHANT, sikFor(1)).state).toBe('APPLIED');
+    expect(rail.inspect.refundsForPayment(paymentId)).toHaveLength(1);
   });
 
   it('keeps answering 503 while it is still reconciling, counting down', async () => {

@@ -15,7 +15,8 @@
     "check:thin": "node scripts/check-thin.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ci": "pnpm run lint && pnpm run typecheck && pnpm run test"
+    "ci": "pnpm run lint && pnpm run typecheck && pnpm run test",
+    "chaos:matrix": "pnpm run build && node packages/chaos/dist/matrix.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",

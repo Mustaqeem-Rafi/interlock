@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { InvariantViolation, sikReceipt, type AttemptOutcome } from '@interlock/core';
 import type { IntentRow, Store } from '@interlock/store';
+import { killAt } from '../kill-points.js';
 import { RailDuplicateReceiptError, RailError } from '../rail/errors.js';
 import type { Rail, Refund, RefundRequest, RefundSpeed } from '../rail/rail.js';
 import { assertMayIssueRailCall, nextState } from './machine.js';
@@ -145,6 +146,8 @@ export function createWal(options: WalOptions): Wal {
       const request = stampRefund(intent.sik, intent.subject_id, intent.amount_minor, order);
       assertStamped(request, intent.sik);
 
+      killAt('before_wal');
+
       // ---------------------------------------------------------------------
       // I2. This call writes the IN_FLIGHT row, the attempt row and the audit
       // record in one transaction, on a connection running synchronous = FULL.
@@ -165,8 +168,13 @@ export function createWal(options: WalOptions): Wal {
       });
       const attemptSeq = started.attempt.attempt_seq;
 
+      killAt('after_wal_before_call');
+
       try {
+        // The rail adapter fires `during_call` from inside the request.
         const refund = await rail.createRefund(request);
+
+        killAt('after_call_before_commit');
 
         store.intents.finishAttempt({
           merchant_id: intent.merchant_id,
@@ -192,6 +200,8 @@ export function createWal(options: WalOptions): Wal {
           audit_kind: 'RAIL_APPLIED',
           audit_payload: { attempt_seq: attemptSeq, rail_entity_id: refund.id },
         });
+
+        killAt('after_commit_before_ack');
 
         return { kind: 'APPLIED', refund, intent: applied };
       } catch (error) {

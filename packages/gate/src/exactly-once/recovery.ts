@@ -52,12 +52,26 @@ export interface RecoveryOptions {
   readonly reconciler: Reconciler;
   readonly now?: () => number;
   readonly limit?: number;
+  /**
+   * Which stale rows to reclaim.
+   *
+   * `all` is the default and the right answer on boot: v0.1 is single-node, so
+   * if we are starting up then nothing else is holding a lease, and a lease
+   * with time left on it belongs to the process that just died. Waiting for it
+   * to expire would leave an IN_FLIGHT row unaccounted for while /health
+   * reported ready — which is exactly the window a restart is supposed to close.
+   *
+   * `expired` is for the periodic in-process sweep, where other work genuinely
+   * may hold a live lease.
+   */
+  readonly reclaim?: 'all' | 'expired';
 }
 
 export function createRecovery(options: RecoveryOptions): Recovery {
   const { store, reconciler } = options;
   const now = options.now ?? ((): number => Date.now());
   const limit = options.limit ?? 1000;
+  const reclaim = options.reclaim ?? 'all';
 
   let phase: RecoveryPhase = 'scanning';
   let outstanding = 0;
@@ -101,10 +115,10 @@ export function createRecovery(options: RecoveryOptions): Recovery {
 
     async run() {
       phase = 'scanning';
-      const stale = store.intents.sweepExpiredLeases(now(), {
-        states: RECOVERABLE,
-        limit,
-      });
+      const stale =
+        reclaim === 'all'
+          ? store.intents.list({ states: RECOVERABLE, limit })
+          : store.intents.sweepExpiredLeases(now(), { states: RECOVERABLE, limit });
 
       const recovered = stale.map(toUnknown);
       outstanding = recovered.length;

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { killAt } from '../kill-points.js';
 import {
   RailDuplicateReceiptError,
   RailNotFoundError,
@@ -105,8 +106,33 @@ const DEFAULT_FEES: MockFeeModel = {
   tax_bps: 1800,
 };
 
+/**
+ * Everything the mock rail holds, in a form that can be written to a file and
+ * read back. The chaos matrix needs upstream state to outlive the process that
+ * created it, exactly as a real rail's state does.
+ */
+export interface MockRailSnapshot {
+  readonly payments: readonly Payment[];
+  readonly orders: readonly Order[];
+  readonly refunds: readonly Refund[];
+  readonly settlements: readonly InstantSettlement[];
+}
+
+export type MockRailJournalEvent =
+  | { readonly kind: 'refund'; readonly refund: Refund }
+  | { readonly kind: 'settlement'; readonly settlement: InstantSettlement };
+
 export interface MockRailOptions {
   readonly faults?: FaultConfig;
+  /** Restore upstream state, e.g. after a restart. */
+  readonly restore?: MockRailSnapshot;
+  /**
+   * Called synchronously the instant an effect is applied and before any
+   * response or fault can intervene. Must be durable by the time it returns:
+   * this models the rail committing upstream, which is the fact the whole
+   * reconciler exists to discover.
+   */
+  readonly journal?: (event: MockRailJournalEvent) => void;
   readonly now?: () => number;
   readonly sleep?: (ms: number) => Promise<void>;
   readonly fees?: Partial<MockFeeModel>;
@@ -137,6 +163,8 @@ export interface MockRailInspector {
   settlements(): readonly InstantSettlement[];
   callCount(operation: RailOperation): number;
   receiptsForPayment(paymentId: string): readonly string[];
+  /** Everything upstream, serialisable. */
+  snapshot(): MockRailSnapshot;
 }
 
 export interface MockRail extends Rail {
@@ -187,13 +215,29 @@ export function createMockRail(options: MockRailOptions = {}): MockRail {
   const fees: MockFeeModel = { ...DEFAULT_FEES, ...options.fees };
   const defaultCurrency = options.currency ?? 'INR';
 
-  const payments = new Map<string, Payment>();
-  const orders = new Map<string, Order>();
-  const refunds: Refund[] = [];
-  const settlements: InstantSettlement[] = [];
+  const restored = options.restore;
+  const payments = new Map<string, Payment>(
+    (restored?.payments ?? []).map((payment) => [payment.id, payment]),
+  );
+  const orders = new Map<string, Order>((restored?.orders ?? []).map((order) => [order.id, order]));
+  const refunds: Refund[] = [...(restored?.refunds ?? [])];
+  const settlements: InstantSettlement[] = [...(restored?.settlements ?? [])];
   const receiptsByPayment = new Map<string, Set<string>>();
+  for (const refund of refunds) {
+    if (refund.receipt === null) continue;
+    const seen = receiptsByPayment.get(refund.payment_id) ?? new Set<string>();
+    seen.add(refund.receipt);
+    receiptsByPayment.set(refund.payment_id, seen);
+  }
 
-  const counters = { payment: 0, order: 0, refund: 0, settlement: 0 };
+  // Ids stay dense and deterministic across a restart because they are minted
+  // from the count of what was restored.
+  const counters = {
+    payment: payments.size,
+    order: orders.size,
+    refund: refunds.length,
+    settlement: settlements.length,
+  };
   const calls: Record<RailOperation, number> = {
     createRefund: 0,
     listRefundsForPayment: 0,
@@ -300,6 +344,10 @@ export function createMockRail(options: MockRailOptions = {}): MockRail {
         throw new RailDuplicateReceiptError(parsed.payment_id, parsed.receipt);
       }
 
+      // Died inside the request, before the rail acted on it. This is why
+      // during_call legitimately ends with no refund at all.
+      killAt('during_call');
+
       // ---------------------------------------------------------------------
       // ORDER MATTERS. The effect is applied to upstream state FIRST, and only
       // then is the response withheld.
@@ -310,6 +358,7 @@ export function createMockRail(options: MockRailOptions = {}): MockRail {
       // Every chaos result depends on this being in this order.
       // ---------------------------------------------------------------------
       const refund = applyRefund(parsed);
+      options.journal?.({ kind: 'refund', refund });
 
       if (hits(faults.slow, call)) {
         // Applied, then stalls past the caller's timeout.
@@ -397,6 +446,7 @@ export function createMockRail(options: MockRailOptions = {}): MockRail {
       };
       // Applied before the response can be withheld, exactly as above.
       settlements.push(settlement);
+      options.journal?.({ kind: 'settlement', settlement });
 
       if (hits(faults.slow, call)) {
         await sleep(faults.slow?.delay_ms ?? 0);
@@ -426,6 +476,12 @@ export function createMockRail(options: MockRailOptions = {}): MockRail {
       refundsForPayment: (paymentId) => refunds.filter((r) => r.payment_id === paymentId),
       settlements: () => [...settlements],
       callCount: (operation) => calls[operation],
+      snapshot: () => ({
+        payments: [...payments.values()],
+        orders: [...orders.values()],
+        refunds: [...refunds],
+        settlements: [...settlements],
+      }),
       receiptsForPayment: (paymentId) => [...(receiptsByPayment.get(paymentId) ?? [])],
     },
   };
