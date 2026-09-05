@@ -197,6 +197,7 @@ export function createMockRail(options: MockRailOptions = {}): MockRail {
   const calls: Record<RailOperation, number> = {
     createRefund: 0,
     listRefundsForPayment: 0,
+    listRefunds: 0,
     fetchPayment: 0,
     fetchOrder: 0,
     createInstantSettlement: 0,
@@ -340,6 +341,20 @@ export function createMockRail(options: MockRailOptions = {}): MockRail {
       return Promise.resolve(
         paginate(
           refunds.filter((refund) => refund.payment_id === paymentId),
+          offset,
+        ),
+      );
+    },
+
+    async listRefunds(sinceMs, cursor) {
+      calls.listRefunds += 1;
+      if (partitioned()) {
+        throw new RailUnavailableError('listRefunds', 'partitioned from the rail');
+      }
+      const offset = decodeCursor('listRefunds', cursor);
+      return Promise.resolve(
+        paginate(
+          refunds.filter((refund) => refund.created_at >= sinceMs),
           offset,
         ),
       );

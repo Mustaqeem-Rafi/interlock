@@ -133,6 +133,15 @@ export interface Rail {
    */
   listRefundsForPayment(paymentId: string, cursor?: string | null): Promise<Page<Refund>>;
 
+  /**
+   * Every refund in a time window, across all payments.
+   *
+   * The reconciler never uses this — it reconciles one intent against one
+   * payment. The drift sweep does, because an orphan is by definition a rail
+   * entity with no intent row, and a per-payment query cannot see one.
+   */
+  listRefunds(sinceMs: number, cursor?: string | null): Promise<Page<Refund>>;
+
   /** Subject resolution. The id this returns is what may enter a SIK. */
   fetchPayment(id: string): Promise<Payment>;
 
@@ -148,6 +157,7 @@ export interface Rail {
 export type RailOperation =
   | 'createRefund'
   | 'listRefundsForPayment'
+  | 'listRefunds'
   | 'fetchPayment'
   | 'fetchOrder'
   | 'createInstantSettlement'
@@ -156,6 +166,7 @@ export type RailOperation =
 export const RAIL_OPERATIONS: readonly RailOperation[] = [
   'createRefund',
   'listRefundsForPayment',
+  'listRefunds',
   'fetchPayment',
   'fetchOrder',
   'createInstantSettlement',

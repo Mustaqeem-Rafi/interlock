@@ -81,6 +81,13 @@ export interface TransitionInput {
   readonly at: number;
   readonly rail_entity_id?: string | null;
   readonly reconcile_attempts?: number;
+  /**
+   * Change the lease in the same transaction as the state change. `undefined`
+   * leaves it alone, `null` clears it, an object claims it. Two transactions
+   * would leave a window where a RECONCILING row carries no lease and is
+   * therefore invisible to the recovery sweep forever.
+   */
+  readonly lease?: { readonly owner: string; readonly expires_at: number } | null;
   readonly audit_kind?: string;
   readonly audit_payload?: Record<string, unknown>;
 }
@@ -138,8 +145,20 @@ export interface IntentRepository {
   finishAttempt(input: FinishAttemptInput): AttemptRow;
   attempts(merchantId: string, sik: string): AttemptRow[];
   releaseLease(merchantId: string, sik: string, at: number): IntentRow;
-  /** The recovery sweep: IN_FLIGHT rows whose lease has lapsed. */
-  sweepExpiredLeases(nowMs: number, limit?: number): IntentRow[];
+  /**
+   * Rows holding a lease that has lapsed. Defaults to IN_FLIGHT; boot recovery
+   * also asks for RECONCILING, since a process can die mid-pass.
+   */
+  sweepExpiredLeases(
+    nowMs: number,
+    options?: { states?: readonly IntentState[]; limit?: number },
+  ): IntentRow[];
+  /** Intents by state and recency, for the reconciliation sweep. */
+  list(options?: {
+    states?: readonly IntentState[];
+    updatedSince?: number;
+    limit?: number;
+  }): IntentRow[];
 }
 
 export function createIntentRepository(db: Db): IntentRepository {
@@ -152,11 +171,7 @@ export function createIntentRepository(db: Db): IntentRepository {
   const selectOne = db.prepare(
     `SELECT ${INTENT_COLUMNS} FROM intents WHERE merchant_id = ? AND sik = ?`,
   );
-  const selectSweep = db.prepare(
-    `SELECT ${INTENT_COLUMNS} FROM intents
-     WHERE state = 'IN_FLIGHT' AND lease_expires_at IS NOT NULL AND lease_expires_at < ?
-     ORDER BY lease_expires_at ASC LIMIT ?`,
-  );
+  const placeholders = (n: number): string => new Array(n).fill('?').join(', ');
   const selectAttempts = db.prepare(
     `SELECT ${ATTEMPT_COLUMNS} FROM intent_attempts
      WHERE merchant_id = ? AND sik = ? ORDER BY attempt_seq ASC`,
@@ -222,11 +237,18 @@ export function createIntentRepository(db: Db): IntentRepository {
           );
         }
 
+        const leaseMode =
+          input.lease === undefined ? 'keep' : input.lease === null ? 'clear' : 'set';
+
         db.prepare(
           `UPDATE intents
              SET state = @to,
                  rail_entity_id = COALESCE(@rail_entity_id, rail_entity_id),
                  reconcile_attempts = COALESCE(@reconcile_attempts, reconcile_attempts),
+                 lease_owner = CASE @lease_mode
+                   WHEN 'set' THEN @lease_owner WHEN 'clear' THEN NULL ELSE lease_owner END,
+                 lease_expires_at = CASE @lease_mode
+                   WHEN 'set' THEN @lease_expires_at WHEN 'clear' THEN NULL ELSE lease_expires_at END,
                  updated_at = @at
            WHERE merchant_id = @merchant_id AND sik = @sik AND state = @from`,
         ).run({
@@ -237,6 +259,9 @@ export function createIntentRepository(db: Db): IntentRepository {
           at: input.at,
           rail_entity_id: input.rail_entity_id ?? null,
           reconcile_attempts: input.reconcile_attempts ?? null,
+          lease_mode: leaseMode,
+          lease_owner: input.lease?.owner ?? null,
+          lease_expires_at: input.lease?.expires_at ?? null,
         });
 
         appendAuditWithin(db, {
@@ -388,8 +413,27 @@ export function createIntentRepository(db: Db): IntentRepository {
       });
     },
 
-    sweepExpiredLeases(nowMs, limit = 100) {
-      return selectSweep.all(nowMs, limit) as IntentRow[];
+    sweepExpiredLeases(nowMs, options = {}) {
+      const states = options.states ?? (['IN_FLIGHT'] as const);
+      return db
+        .prepare(
+          `SELECT ${INTENT_COLUMNS} FROM intents
+           WHERE state IN (${placeholders(states.length)})
+             AND lease_expires_at IS NOT NULL AND lease_expires_at < ?
+           ORDER BY lease_expires_at ASC LIMIT ?`,
+        )
+        .all(...states, nowMs, options.limit ?? 100) as IntentRow[];
+    },
+
+    list(options = {}) {
+      const states = options.states ?? IntentState.options;
+      return db
+        .prepare(
+          `SELECT ${INTENT_COLUMNS} FROM intents
+           WHERE state IN (${placeholders(states.length)}) AND updated_at >= ?
+           ORDER BY updated_at ASC LIMIT ?`,
+        )
+        .all(...states, options.updatedSince ?? 0, options.limit ?? 1000) as IntentRow[];
     },
   };
 }

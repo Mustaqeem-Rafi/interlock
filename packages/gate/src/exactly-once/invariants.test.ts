@@ -460,21 +460,38 @@ describe('the write-ahead stamp', () => {
     expect(refund?.notes['interlock_sik']).toBe(SIK);
   });
 
-  it('takes a 30 second lease under this process id', async () => {
-    setUp({ faults: { ambiguous_504: {} } });
+  it('holds a 30 second lease under this process id while the call is in flight', async () => {
     const authorized = authorize(propose(store, newIntent()).intent);
-    await wal.issueRefund(authorized);
 
-    const raw = new Database(dbPath, { readonly: true });
-    const row = raw
-      .prepare('SELECT lease_owner, lease_expires_at FROM intents WHERE sik = ?')
-      .get(SIK) as { lease_owner: string; lease_expires_at: number };
-    raw.close();
-    expect(row.lease_owner).toBe('worker-under-test');
-    // The lease runs 30 seconds from when the attempt started, not from T0.
+    // The lease only matters while the attempt is outstanding, so read it from
+    // a separate connection at the moment the rail is being called.
+    let seen: { lease_owner: string | null; lease_expires_at: number | null } | undefined;
+    const observing = {
+      ...rail,
+      createRefund: async (request: Parameters<MockRail['createRefund']>[0]) => {
+        const raw = new Database(dbPath, { readonly: true });
+        seen = raw
+          .prepare('SELECT lease_owner, lease_expires_at FROM intents WHERE sik = ?')
+          .get(SIK) as { lease_owner: string | null; lease_expires_at: number | null };
+        raw.close();
+        return rail.createRefund(request);
+      },
+    };
+    await createWal({
+      store,
+      rail: observing,
+      now: () => clock,
+      owner: 'worker-under-test',
+    }).issueRefund(authorized);
+
     const [attempt] = store.intents.attempts('acc_KtqXyZ01', SIK);
-    expect(row.lease_expires_at).toBe(attempt!.started_at + LEASE_MS);
+    expect(seen?.lease_owner).toBe('worker-under-test');
+    expect(seen?.lease_expires_at).toBe(attempt!.started_at + LEASE_MS);
     expect(LEASE_MS).toBe(30_000);
+
+    // And it is released the moment the attempt settles, so the recovery sweep
+    // never has to filter leases belonging to finished work.
+    expect(store.intents.require('acc_KtqXyZ01', SIK).lease_owner).toBeNull();
   });
 
   it('cannot be told to skip the stamp, because there is nowhere to say it', () => {

@@ -188,6 +188,7 @@ export function createWal(options: WalOptions): Wal {
           to: nextState('IN_FLIGHT', 'RAIL_APPLIED'),
           at: now(),
           rail_entity_id: refund.id,
+          lease: null,
           audit_kind: 'RAIL_APPLIED',
           audit_payload: { attempt_seq: attemptSeq, rail_entity_id: refund.id },
         });
@@ -212,6 +213,7 @@ export function createWal(options: WalOptions): Wal {
           from: 'IN_FLIGHT',
           to: nextState('IN_FLIGHT', event),
           at: now(),
+          lease: null,
           audit_kind: event,
           audit_payload: {
             attempt_seq: attemptSeq,
@@ -228,7 +230,7 @@ export function createWal(options: WalOptions): Wal {
     },
 
     expiredLeases(limit = 100) {
-      return store.intents.sweepExpiredLeases(now(), limit);
+      return store.intents.sweepExpiredLeases(now(), { limit });
     },
   };
 }
