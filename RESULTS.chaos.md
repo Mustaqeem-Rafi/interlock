@@ -1,6 +1,6 @@
 # Chaos matrix results
 
-Five kill points, 2 trials each, 50 trials total.
+Five kill points, 20 trials each, 100 trials total.
 
 **Exactly-once violations: 0**
 
@@ -25,36 +25,16 @@ A trial passes only if all four hold after the restart:
 
 | Kill point | Fault | Trials | Expected after recovery | Observed after recovery | After the agent retries | Violations |
 | --- | --- | --- | --- | --- | --- | --- |
-| `before_wal` | none | 2 | 0 refunds, nothing attempted | 0 refunds ×2<br>AUTHORIZED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `before_wal` | ambiguous_504 | 2 | 0 refunds, nothing attempted | 0 refunds ×2<br>AUTHORIZED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `before_wal` | slow | 2 | 0 refunds, nothing attempted | 0 refunds ×2<br>AUTHORIZED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `before_wal` | dup_response | 2 | 0 refunds, nothing attempted | 0 refunds ×2<br>AUTHORIZED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `before_wal` | partition | 2 | 0 refunds, nothing attempted | 0 refunds ×2<br>AUTHORIZED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_wal_before_call` | none | 2 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×2<br>CONFIRMED_NOT_APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_wal_before_call` | ambiguous_504 | 2 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×2<br>CONFIRMED_NOT_APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_wal_before_call` | slow | 2 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×2<br>CONFIRMED_NOT_APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_wal_before_call` | dup_response | 2 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×2<br>CONFIRMED_NOT_APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_wal_before_call` | partition | 2 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×2<br>QUARANTINED ×2 | 0 refunds ×2<br>QUARANTINED ×2 | 0 |
-| `during_call` | none | 2 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×2<br>CONFIRMED_NOT_APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `during_call` | ambiguous_504 | 2 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×2<br>CONFIRMED_NOT_APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `during_call` | slow | 2 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×2<br>CONFIRMED_NOT_APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `during_call` | dup_response | 2 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×2<br>CONFIRMED_NOT_APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `during_call` | partition | 2 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×2<br>QUARANTINED ×2 | 0 refunds ×2<br>QUARANTINED ×2 | 0 |
-| `after_call_before_commit` | none | 2 | 1 refund, APPLIED | 1 refund ×2<br>APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_call_before_commit` | ambiguous_504 | 2 | 1 refund, APPLIED | 1 refund ×2<br>APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_call_before_commit` | slow | 2 | 1 refund, APPLIED | 1 refund ×2<br>APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_call_before_commit` | dup_response | 2 | 1 refund, APPLIED | 1 refund ×2<br>APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_call_before_commit` | partition | 2 | 1 refund, APPLIED | 1 refund ×2<br>QUARANTINED ×2 | 1 refund ×2<br>QUARANTINED ×2 | 0 |
-| `after_commit_before_ack` | none | 2 | 1 refund, APPLIED | 1 refund ×2<br>APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_commit_before_ack` | ambiguous_504 | 2 | 1 refund, APPLIED | 1 refund ×2<br>APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_commit_before_ack` | slow | 2 | 1 refund, APPLIED | 1 refund ×2<br>APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_commit_before_ack` | dup_response | 2 | 1 refund, APPLIED | 1 refund ×2<br>APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
-| `after_commit_before_ack` | partition | 2 | 1 refund, APPLIED | 1 refund ×2<br>APPLIED ×2 | 1 refund ×2<br>APPLIED ×2 | 0 |
+| `before_wal` | none | 20 | 0 refunds, nothing attempted | 0 refunds ×20<br>AUTHORIZED ×20 | —<br>— | 0 |
+| `after_wal_before_call` | none | 20 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×20<br>CONFIRMED_NOT_APPLIED ×20 | —<br>— | 0 |
+| `during_call` | none | 20 | 0 refunds, CONFIRMED_NOT_APPLIED | 0 refunds ×20<br>CONFIRMED_NOT_APPLIED ×20 | —<br>— | 0 |
+| `after_call_before_commit` | none | 20 | 1 refund, APPLIED | 1 refund ×20<br>APPLIED ×20 | —<br>— | 0 |
+| `after_commit_before_ack` | none | 20 | 1 refund, APPLIED | 1 refund ×20<br>APPLIED ×20 | —<br>— | 0 |
 
-| **Total** | | **50** | | | | **0** |
+| **Total** | | **100** | | | | **0** |
 
-44 of 50 issuing processes were confirmed killed at their
-kill point. The other 6 were preempted: a fault threw inside the rail
+100 of 100 issuing processes were confirmed killed at their
+kill point. The other 0 were preempted: a fault threw inside the rail
 call before the kill point could be reached, so surviving there is correct
 behaviour rather than a disarmed matrix. A kill that was reachable and did not
 land is a violation in its own right, because a SIGKILL that silently failed
@@ -103,6 +83,6 @@ A second process is then started against the same two files. It runs boot
 recovery to completion before doing anything else, and only then is the
 ledger compared against the rail journal.
 
-Run it with `pnpm chaos:matrix --trials 2`.
+Run it with `pnpm chaos:matrix --trials 20`.
 
-Started 2026-09-05T12:15:28.558Z, took 287s.
+Started 2026-09-05T12:58:48.168Z, took 330s.
