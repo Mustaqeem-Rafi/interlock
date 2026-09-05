@@ -2,10 +2,11 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { InvariantViolation } from '@interlock/core';
 import { loadMandate } from './interlock-mcp.js';
 
 /**
@@ -22,18 +23,58 @@ const REPO = resolve(HERE, '..', '..', '..', '..');
 const BIN = join(REPO, 'packages', 'gate', 'dist', 'bin', 'interlock-mcp.js');
 const MANDATE = join(REPO, 'examples', 'mandate.yaml');
 
-/** The binary runs from dist, so the suite needs a build to have happened. */
-function built(): boolean {
+/**
+ * Can a child process here open a real ledger?
+ *
+ * This is the precondition the whole suite rests on, and it is worth probing
+ * directly rather than inferring. Two weaker probes were wrong: `--version`
+ * short-circuits before the store is opened, so it passes on a machine whose
+ * better-sqlite3 has no binding for its Node ABI and every test below then
+ * fails with "Connection closed" as if the proxy were broken; and running the
+ * server itself proves nothing either way, because with no stdin attached it
+ * sees EOF and exits immediately, which is correct behaviour and not a fault.
+ *
+ * So ask the store, in a child, with the real driver.
+ */
+function cannotOpenALedger(): string | undefined {
+  const probe = mkdtempSync(join(tmpdir(), 'interlock-probe-'));
+  const storeUrl = pathToFileURL(join(REPO, 'packages', 'store', 'dist', 'index.js')).href;
+  // JSON.stringify escapes the Windows separators for the -e literal.
+  const db = join(probe, 'p.db');
   try {
-    execFileSync(process.execPath, [BIN, '--version'], { stdio: 'pipe' });
-    return true;
-  } catch {
-    return false;
+    execFileSync(
+      process.execPath,
+      ['-e', `import(${JSON.stringify(storeUrl)}).then((m) => m.openStore(${JSON.stringify(db)}).close())`],
+      { stdio: 'pipe', timeout: 20_000 },
+    );
+    return undefined;
+  } catch (error) {
+    const e = error as { stderr?: Buffer };
+    const text = e.stderr?.toString() ?? String(error);
+    const lines = text.split(String.fromCharCode(10)).filter((line) => line.trim() !== '');
+    // Node prints the offending source line first; the cause is further down.
+    return lines.find((line) => /^[A-Za-z_$][\w$]*Error:/.test(line.trim())) ?? lines[0] ?? text;
+  } finally {
+    rmSync(probe, { recursive: true, force: true, maxRetries: 5 });
   }
 }
 
-const ready = built();
-const maybe = ready ? describe : describe.skip;
+const cannotServe = cannotOpenALedger();
+
+// Locally a missing native binding is a fact about the laptop, so skipping is
+// honest. In CI it is the only thing proving the front door works, so a skip
+// there would quietly delete the coverage this file exists to provide.
+if (cannotServe !== undefined && process.env['CI'] !== undefined) {
+  throw new InvariantViolation(
+    'bin.test',
+    `a child process cannot open a ledger, and this is CI: ${cannotServe}`,
+  );
+}
+if (cannotServe !== undefined) {
+  process.stderr.write(`bin.test: skipping the stdio suite - ${cannotServe}` + String.fromCharCode(10));
+}
+
+const maybe = cannotServe === undefined ? describe : describe.skip;
 
 describe('interlock-mcp: the mandate loader', () => {
   it('parses the shipped example mandate', () => {

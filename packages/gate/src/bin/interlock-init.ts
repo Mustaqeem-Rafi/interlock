@@ -10,7 +10,7 @@ import { manifestHash, type UpstreamTool } from '../proxy/upstream.js';
 import { QUESTIONS, type InitAnswers } from '../init/questions.js';
 import { runInit } from '../init/cli.js';
 import type { AuthoringModel } from '../init/author.js';
-import { MOCK_MANIFEST } from './interlock-mcp.js';
+import { MOCK_MANIFEST } from '../proxy/manifest.js';
 
 /**
  * `interlock init` — the one place a model touches the money path.

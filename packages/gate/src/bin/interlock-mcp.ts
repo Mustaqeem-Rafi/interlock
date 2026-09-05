@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { InvariantViolation, Mandate, loadEnv, type Mandate as MandateType } from '@interlock/core';
+import { InvariantViolation, Mandate, type Mandate as MandateType } from '@interlock/core';
 import { openStore, type Store } from '@interlock/store';
 import { parse } from 'yaml';
 import { createReconciler } from '../exactly-once/reconciler.js';
@@ -15,7 +15,8 @@ import { createMockRail, type MockRail } from '../rail/mock.js';
 import type { Rail } from '../rail/rail.js';
 import { createEngine } from '../proxy/engine.js';
 import { createProxyServer } from '../proxy/server.js';
-import { createUpstream, type Upstream, type UpstreamTool } from '../proxy/upstream.js';
+import { createUpstream, type Upstream } from '../proxy/upstream.js';
+import { MOCK_MANIFEST } from '../proxy/manifest.js';
 
 /**
  * `interlock-mcp` — the front door.
@@ -49,7 +50,8 @@ OPTIONS
   --mandate <path>       Mandate YAML a human approved. Required.
                          Generate one with: interlock init --upstream <url>
   --rail <name>          mock (default) | razorpay
-  --db <path>            SQLite ledger. Defaults to INTERLOCK_DB_PATH.
+  --db <path>            SQLite ledger. Defaults to INTERLOCK_DB_PATH, and
+                         failing that to a file beside the mandate.
   --upstream-command <c> Spawn a real upstream MCP server, e.g.
                          --upstream-command "docker run -i --rm razorpay/mcp"
                          Omit to use the built-in mock rail.
@@ -60,9 +62,11 @@ OPTIONS
   --help, --version
 
 ENVIRONMENT
-  INTERLOCK_DB_PATH        where the ledger lives (required unless --db)
-  INTERLOCK_CONSOLE_TOKEN  bearer token for the operator console (required)
+  INTERLOCK_DB_PATH        where the ledger lives; overridden by --db
   RAZORPAY_KEY_ID/SECRET   required only when --rail razorpay
+
+The operator console's bearer token is not read here. This binary speaks MCP on
+stdio and serves no console, so it does not ask for the console's credentials.
 
 The money path is deterministic. No model is consulted at decision time.
 `;
@@ -110,41 +114,27 @@ export function loadMandate(path: string): MandateType {
 }
 
 /**
- * The tools we present when there is no upstream server to ask.
+ * Where the ledger lives when nobody said.
  *
- * Used by the mock rail so the demo is self-contained. With
- * --upstream-command we ask the real server instead and never invent a manifest.
+ * The ledger is what makes a second identical refund a no-op instead of a
+ * second refund, so a ledger that moves is a ledger that fails open. Defaulting
+ * to a fixed name in the working directory would do exactly that: run the same
+ * command from a different directory tomorrow and the engine sees an empty
+ * ledger, believes nothing has been tried, and pays again.
+ *
+ * So the ledger's identity is derived from the mandate's identity instead. The
+ * mandate is the standing authority to move money and the one path the operator
+ * names explicitly; the ledger of what was done under it belongs beside it. Two
+ * runs naming the same mandate always find the same ledger, and two different
+ * mandates are two different authorities that correctly keep separate books.
+ *
+ * --db and INTERLOCK_DB_PATH both take precedence, and the resolved path is
+ * printed at boot, so this is a default and never a surprise.
  */
-export const MOCK_MANIFEST: readonly UpstreamTool[] = [
-  {
-    name: 'fetch_payment',
-    description: 'Fetch a payment by id.',
-    inputSchema: { type: 'object', properties: { payment_id: { type: 'string' } } },
-  },
-  {
-    name: 'fetch_order',
-    description: 'Fetch an order by id.',
-    inputSchema: { type: 'object', properties: { order_id: { type: 'string' } } },
-  },
-  {
-    name: 'create_refund',
-    description: 'Refund a payment. amount is in minor units (paise).',
-    inputSchema: {
-      type: 'object',
-      properties: { payment_id: { type: 'string' }, amount: { type: 'integer' } },
-      required: ['payment_id', 'amount'],
-    },
-  },
-  {
-    name: 'create_instant_settlement',
-    description: 'Settle available balance on demand. amount is in minor units.',
-    inputSchema: {
-      type: 'object',
-      properties: { amount: { type: 'integer' } },
-      required: ['amount'],
-    },
-  },
-];
+function ledgerBesideMandate(mandatePath: string): string {
+  const full = resolve(mandatePath);
+  return join(dirname(full), `${basename(full).replace(/\.[^.]+$/, '')}.ledger.db`);
+}
 
 /** A demo payment and order, so a fresh clone has something to refund. */
 function seedMock(rail: MockRail): void {
@@ -228,11 +218,8 @@ export async function main(argv: readonly string[]): Promise<number> {
     note('--purpose-check: the advisory purpose gate is not implemented in v0.1; continuing without it');
   }
 
-  // Fails loudly and early if the environment is incomplete. This is the only
-  // place loadEnv is called, which is why it is called before anything opens.
-  const env = loadEnv();
   const mandate = loadMandate(args.mandate);
-  const dbPath = args.db ?? env.INTERLOCK_DB_PATH;
+  const dbPath = args.db ?? process.env['INTERLOCK_DB_PATH'] ?? ledgerBesideMandate(args.mandate);
 
   const store: Store = openStore(dbPath);
   const rail = createMockRail({});

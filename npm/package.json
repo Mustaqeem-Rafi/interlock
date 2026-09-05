@@ -1,0 +1,44 @@
+{
+  "name": "interlock-mcp",
+  "version": "0.1.0",
+  "description": "An MCP proxy that sits between an AI agent and a payment API so the agent cannot pay twice, and cannot pay more than it was authorised to.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Mustaqeem Rafi",
+  "homepage": "https://github.com/Mustaqeem-Rafi/interlock#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mustaqeem-Rafi/interlock.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Mustaqeem-Rafi/interlock/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "payments",
+    "razorpay",
+    "idempotency",
+    "exactly-once",
+    "ai-agents",
+    "agent-safety",
+    "guardrails"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "bin": {
+    "interlock-mcp": "./dist/interlock-mcp.js",
+    "interlock-init": "./dist/interlock-init.js"
+  },
+  "files": [
+    "dist",
+    "schema.sql",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "better-sqlite3": "^12.11.1"
+  }
+}

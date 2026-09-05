@@ -36,6 +36,8 @@ npx interlock-mcp --mandate ./mandate.yaml
 
 Point your agent at Interlock instead of at the payment API's MCP server. One line of config changes; no code does.
 
+The ledger is what makes a second identical refund a no-op, so it is never allowed to wander: with no `--db` and no `INTERLOCK_DB_PATH`, it is created beside the mandate that authorised the spending, and the resolved path is printed at startup. Two runs naming the same mandate always find the same ledger.
+
 ```jsonc
 {
   "mcpServers": {

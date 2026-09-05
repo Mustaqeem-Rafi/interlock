@@ -15,3 +15,12 @@ data/
 
 # local-only vitest shim config (node:sqlite stand-in)
 vitest.local.config.ts
+
+# The publishable package: only its manifest is authored. Everything else under
+# npm/ is copied or bundled by scripts/build-npm.mjs, so committing it would
+# create a second copy of the source that can silently disagree with the first.
+npm/*.tgz
+npm/schema.sql
+npm/README.md
+npm/LICENSE
+npm/examples/

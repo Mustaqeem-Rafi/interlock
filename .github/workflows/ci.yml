@@ -39,6 +39,70 @@ jobs:
       - name: Test
         run: pnpm run test
 
+  package:
+    name: npm package (packed, installed, run)
+    needs: check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Bundles the three workspace packages into the two binaries. The
+      # workspace depends on itself with `workspace:*`, which no consumer can
+      # resolve, so what is published is the bundle and never the raw dist.
+      - name: Build the publishable package
+        run: pnpm run build:npm
+
+      # Everything below deliberately leaves the repo behind. It installs the
+      # tarball into an empty directory with plain npm, so nothing resolves
+      # through the workspace and a missing dependency or a stale `workspace:*`
+      # shows up here instead of in a stranger's terminal.
+      - name: Pack and install as a consumer would
+        run: |
+          set -euo pipefail
+          TARBALL="$(cd npm && npm pack --silent)"
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cp "npm/$TARBALL" "$RUNNER_TEMP/consumer/"
+          cd "$RUNNER_TEMP/consumer"
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund "./$TARBALL"
+          echo "TARBALL=$TARBALL" >> "$GITHUB_ENV"
+
+      - name: The binaries are on PATH and run
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/consumer"
+          ./node_modules/.bin/interlock-mcp --version
+          ./node_modules/.bin/interlock-init --version
+
+      # The README's first instruction, executed. A refund applies, the same
+      # call made twice moves money once, and a refund past the mandate is
+      # refused as a final answer rather than as a protocol error an agent
+      # would retry. If npx is broken, this is where it is discovered.
+      - name: A stock MCP client drives the installed binary
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/consumer"
+          cp node_modules/interlock-mcp/examples/mandate.yaml ./mandate.yaml
+          npm install --no-audit --no-fund @modelcontextprotocol/sdk@^1.30.0
+          node "$GITHUB_WORKSPACE/scripts/smoke-npm.mjs"             ./node_modules/.bin/interlock-mcp ./mandate.yaml
+
+      - name: Upload the tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: interlock-mcp-tarball
+          path: npm/*.tgz
+
   results:
     name: results (machine-written)
     needs: check
