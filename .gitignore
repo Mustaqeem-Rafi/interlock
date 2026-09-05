@@ -36,3 +36,6 @@ what_broke.txt
 
 # Scratch ledger for scripts/demo.mjs and console rehearsals.
 .demo/
+
+# QA variants, written only by `build.mjs --qa`. Never served.
+docs/design/landing/.qa/

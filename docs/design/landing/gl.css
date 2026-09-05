@@ -1,0 +1,190 @@
+
+/* ═══════════════════ the x-ray ═══════════════════
+   One fixed WebGL canvas (#gl) sits above the in-flow page and below the header, pointer-transparent.
+   It only paints inside .stage rectangles; there it paints the page background first, so a stage
+   can pin over scrolling text on small screens. Everything with words stays in the DOM (z 2).
+   No class on <html> → none of this applies and the page is exactly its 2D self.          */
+#gl{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100lvh;z-index:1;pointer-events:none;display:none;opacity:0;transition:opacity .9s ease}
+.gl #gl{display:block}
+.gl.ready #gl{opacity:1}
+.stage{position:relative;z-index:2}
+.xr{display:none}
+.gl .xr{display:block;position:absolute;inset:0;pointer-events:none;font-family:var(--mono)}
+.xr-in{position:absolute;inset:0;max-width:var(--max);margin:0 auto;padding:0 var(--gut)}
+.xr-sr{display:none}
+.gl .xr-sr{display:block}
+.xr-boot{position:absolute;left:64%;top:52%;transform:translate(-50%,-50%);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+.ready .xr-boot{display:none}
+section[id]{scroll-margin-top:78px}
+
+/* projected labels — real type, positioned from the scene each frame. Two sizes: the eyebrow and the readout value. */
+.xr-labels{position:absolute;inset:0;overflow:hidden}
+.lab{position:absolute;left:0;top:0;white-space:nowrap;font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);opacity:0;transition:opacity .4s ease;will-change:transform;line-height:1.5}
+.lab.on{opacity:1}
+.lab.hi{color:var(--muted)}
+.lab.txt{color:var(--text)}
+.lab.bad{color:var(--block)}.lab.ok{color:var(--allow)}.lab.hold{color:var(--hold)}
+.lab.evd{text-transform:none;letter-spacing:.02em;font-size:12px;color:var(--dim)}
+.lab.evd b{color:var(--text);font-weight:400}
+.lab.evd.hi{color:var(--muted)}
+.lab.evd .k{display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
+.lab.evd .red{color:var(--block)}
+.lab.sans{font-family:var(--sans);font-size:15.5px;letter-spacing:0;text-transform:none;color:var(--muted)}
+.lab.sans b{color:var(--text);font-weight:500}
+.lab.big{font-size:clamp(22px,2.4vw,30px);letter-spacing:-.04em;text-transform:none;color:var(--text);line-height:1}
+.lab.big.bad{color:var(--block)}
+.lab.big.ok{color:var(--allow)}
+.lab.big.hold{color:var(--hold)}
+.lab.big small{display:block;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-top:8px}
+.lab.chip{height:24px;display:inline-flex;align-items:center;gap:10px;padding:0 9px;border:1px solid var(--block-bd);border-radius:4px;font-size:11px;letter-spacing:.1em;color:var(--block)}
+.lab.chip i{font-style:normal;color:var(--dim);letter-spacing:.16em}
+.lab .tick{display:inline-block;width:10px;height:1px;background:currentColor;vertical-align:middle;margin-right:8px;opacity:.7}
+
+/* the index at the viewport edge: which layer the camera is in, and how much of the sequence is left */
+.xr-index{position:absolute;right:var(--gut);top:calc(58px + 26px);display:grid;gap:5px;justify-items:end;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);text-align:right;opacity:0;transition:opacity .4s ease}
+.xr-index.on{opacity:1}
+.xr-index .v{color:var(--text)}
+.xr-index .bar{display:block;position:relative;width:120px;height:1px;background:var(--border);margin-top:4px}
+.xr-index .bar b{position:absolute;left:0;top:0;height:100%;width:0;background:var(--muted)}
+.dive-index{right:0;top:auto;bottom:0}
+
+/* captions: three in the whole sequence — the threshold, the verdict, the mechanism */
+.xr-caps{position:absolute;left:var(--gut);bottom:12vh;width:min(40ch,calc(100% - 2*var(--gut)))}
+.xr-cap{position:absolute;left:0;bottom:0;width:100%;opacity:0;transform:translateY(6px);transition:opacity .45s ease,transform .45s ease}
+.xr-cap.on{opacity:1;transform:none}
+.xr-cap .k{display:block;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.xr-cap p{font-family:var(--sans);font-size:17px;line-height:1.45;color:var(--muted);text-transform:none;letter-spacing:0}
+.xr-cap p b{color:var(--text);font-weight:500}
+.xr-cap[data-cap="stop"] .k{color:var(--block)}
+
+/* hero. Without .gl the track is the old two-column hero grid; with .gl it is a scroll track holding a pinned stage. */
+.track-hero{width:100%;max-width:var(--max);margin:0 auto;padding:0 var(--gut);display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:64px;align-items:end}
+.hero-copy-wrap{min-width:0}
+.hero-grid{display:block}
+.xr-hint{display:none}
+.motion .xr-hint{display:block;margin-top:34px;font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.motion .xr-hint b{font-weight:400;display:inline-block;animation:nudge 2.4s ease-in-out infinite}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+.gl .hero{padding:0}
+.gl .track-hero{max-width:none;padding:0;display:block;position:relative}
+.motion .track-hero{height:520vh}
+.gl .hero-copy-wrap{position:sticky;top:0;height:0;z-index:3;max-width:var(--max);margin:0 auto;padding:0 var(--gut)}
+.gl .hero-copy{position:absolute;top:calc(58px + 6vh);left:var(--gut);max-width:560px;will-change:opacity,transform}
+.gl .hero h1{margin-top:18px;font-size:clamp(28px,2.7vw,38px)}
+.gl .hero .actions{margin-top:26px}
+.gl .stage-hero{height:100svh;min-height:600px;overflow:hidden}
+.motion .stage-hero{position:sticky;top:0}
+.gl .hero-grid{position:absolute;inset:0;max-width:var(--max);margin:0 auto;padding:0 var(--gut);display:flex;flex-direction:column;justify-content:flex-end}
+.gl .readout{will-change:opacity,transform;padding-bottom:26px;background:linear-gradient(to top,rgba(12,14,17,.92) 60%,rgba(12,14,17,0))}
+.gl .hero-copy.gone,.gl .readout.gone{pointer-events:none}
+.gl .trace-wrap{display:none}
+.gl #incident .tr .v{font-size:clamp(22px,2.2vw,30px)}
+
+/* chapter 02 — the dive */
+.stage-dive{display:none}
+.gl .dive{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.58fr);gap:0 56px;align-items:start}
+.gl .stage-dive{display:block;position:sticky;top:78px;height:calc(100svh - 100px);min-height:420px;max-height:760px;margin-top:64px;align-self:start}
+.gl .stage-dive.hovering .xr{cursor:pointer}
+.gl .stage-dive .xr-labels{pointer-events:auto}
+.gl .gate{grid-template-columns:34px 56px 150px minmax(0,1fr)}
+.gl .gate .ev{grid-column:4;margin-top:16px;max-width:440px}
+.gl .machine-note{grid-template-columns:34px 56px 150px minmax(0,1fr)}
+.motion .machine-out{padding:24px 0 150px}
+.gl .gate.focus::before{background:var(--text);border-color:var(--text)}
+.gl .gate.model.focus::before{background:var(--hold);border-color:var(--hold)}
+
+/* chapter 04 — durability */
+.stage-kill{display:none}
+.gl .replay{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"states stage" "claims media";row-gap:72px}
+.gl .states{grid-area:states}
+.gl .stage-kill{display:block;grid-area:stage;position:sticky;top:96px;aspect-ratio:4/3;max-height:calc(100svh - 130px);align-self:start}
+.gl .replay-side{display:contents}
+.gl .claims{grid-area:claims}
+.gl .mediawrap{grid-area:media}
+.gl .claims p{max-width:46ch}
+.motion .st{padding-bottom:48px}
+.motion .st.unsure{padding-bottom:88px}
+.motion .st.big{padding:24px 0 96px}
+.motion .brk{margin-bottom:56px}
+.motion .st.on,.motion .brk.on{transition-duration:.25s}
+
+/* the invitation — the clean path */
+.stage-cta{display:none}
+.gl .stage-cta{display:block;aspect-ratio:21/8;margin-bottom:64px}
+.gl .final{padding-top:120px}
+.gl .final .trace .tr,.gl .final .trace .cutline{opacity:.3;transition:opacity .5s ease}
+.gl .final .trace .lit{opacity:1}
+
+/* chapter 06 — the handoff */
+.adopt-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.95fr);gap:72px;align-items:end}
+.handoff{display:flex;align-items:stretch;font-family:var(--mono);justify-self:end;width:100%;max-width:560px}
+.ho-node{display:flex;flex-direction:column;justify-content:center;gap:6px;padding:14px 0;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);min-width:0}
+.ho-node b{font-weight:400;color:var(--muted)}
+.ho-node span{text-transform:none;letter-spacing:.02em;font-size:12px;color:var(--dim);overflow-wrap:anywhere}
+.ho-node.on{padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-ctl);color:var(--text)}
+.ho-node.on b{color:var(--text)}
+.ho-node.on span{color:var(--link)}
+.ho-link{flex:1 1 28px;min-width:22px;position:relative}
+.ho-link::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--border)}
+.ho-link::after{content:"";position:absolute;right:0;top:50%;width:5px;height:5px;border-right:1px solid var(--muted);border-top:1px solid var(--muted);transform:translateY(-50%) rotate(45deg)}
+.ho-cut{position:relative;width:1px;margin:0 22px 0 8px;border-left:1px dashed var(--hold);opacity:.9}
+.ho-cut b{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--hold);font-weight:400;white-space:nowrap}
+
+/* chapter 05 — telemetry rows arrive one at a time; the values stay whatever RESULTS.md says */
+.ci .meta>div,.ci .report .row{opacity:0;transform:translateY(4px);transition:opacity .5s ease,transform .5s ease}
+.ci.in .meta>div,.ci.in .report .row{opacity:1;transform:none}
+.ci.in .meta>div:nth-child(2){transition-delay:.08s}.ci.in .meta>div:nth-child(3){transition-delay:.16s}.ci.in .meta>div:nth-child(4){transition-delay:.24s}.ci.in .meta>div:nth-child(5){transition-delay:.32s}
+.ci.in .report .row:nth-of-type(1){transition-delay:.25s}.ci.in .report .row:nth-of-type(2){transition-delay:.4s}.ci.in .report .row:nth-of-type(3){transition-delay:.55s}.ci.in .report .row:nth-of-type(4){transition-delay:.7s}
+
+@media (max-width:1100px){
+  .gl .dive{grid-template-columns:minmax(0,1fr) minmax(260px,.5fr);gap:0 40px}
+  .adopt-head{grid-template-columns:minmax(0,1fr);gap:44px}
+  .handoff{justify-self:start}
+}
+@media (max-width:860px){
+  .track-hero{grid-template-columns:minmax(0,1fr);gap:40px}
+  .gl .hero-copy-wrap{position:static;height:auto;padding:52px var(--gut) 30px}
+  .gl .hero-copy{position:static;max-width:none}
+  .gl .hero h1{font-size:clamp(28px,7vw,34px)}
+  .gl .stage-hero{min-height:520px}
+  .gl .readout{grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--hair);padding-bottom:18px}
+  .gl .ro,.gl .ro+.ro{padding:14px 0 0 0;border-top:0;border-left:0}
+  .gl .ro+.ro{padding-left:14px;border-left:1px solid var(--hair)}
+  .gl .ro .v{font-size:20px}
+  .gl .ro .k{font-size:9px}
+  .gl .ro .s{display:none}
+  .xr-index{top:calc(58px + 16px)}
+  .xr-caps{bottom:7vh}
+  .xr-cap p{font-size:15px}
+  .lab.evd{font-size:11px}
+  .lab.sans{font-size:14px}
+  .gl .gate{grid-template-columns:34px minmax(0,1fr)}
+  .gl .gate .ev{grid-column:2;max-width:none}
+  .gl .machine-note{grid-template-columns:34px minmax(0,1fr)}
+  .gl .dive{display:flex;flex-direction:column}
+  .gl .stage-dive{order:-1;position:sticky;top:58px;height:34svh;min-height:220px;max-height:340px;margin:24px 0 8px;width:100%}
+  .gl .stage-dive .dive-index{bottom:8px;right:0}
+  .gl .replay{grid-template-columns:minmax(0,1fr);grid-template-areas:"stage" "states" "claims" "media"}
+  .gl .stage-kill{position:sticky;top:58px;aspect-ratio:auto;height:34svh;min-height:220px;max-height:340px;z-index:3}
+  .motion .st{padding-bottom:40px}
+  .gl .stage-cta{aspect-ratio:16/10;margin-bottom:40px}
+  .handoff{flex-direction:column;max-width:none}
+  .ho-link{flex:0 0 28px;width:1px;margin-left:14px}
+  .ho-link::before{left:0;right:auto;top:0;bottom:0;width:1px;height:auto}
+  .ho-link::after{right:auto;left:-2px;top:auto;bottom:0;transform:rotate(135deg)}
+  .ho-cut{width:auto;height:1px;border-left:0;border-top:1px dashed var(--hold);margin:10px 0 16px}
+  .ho-cut b{left:0;bottom:calc(100% + 6px);transform:none}
+}
+@media (max-height:700px){
+  .gl .readout{padding-bottom:16px}
+  .gl .ro{padding-top:12px}
+  .gl .ro .v{font-size:22px;margin-top:8px}
+  .gl .ro .s{display:none}
+}
+@media (max-height:540px){
+  .gl .readout{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .ci .meta>div,.ci .report .row{opacity:1;transform:none}
+  .lab,.xr-cap,.xr-index{transition:none}
+}

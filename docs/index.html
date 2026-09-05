@@ -452,7 +452,7 @@ section[id]{scroll-margin-top:78px}
 .xr-index .v{color:var(--text)}
 .xr-index .bar{display:block;position:relative;width:120px;height:1px;background:var(--border);margin-top:4px}
 .xr-index .bar b{position:absolute;left:0;top:0;height:100%;width:0;background:var(--muted)}
-.dive-index{right:0;top:0}
+.dive-index{right:0;top:auto;bottom:0}
 
 /* captions: three in the whole sequence — the threshold, the verdict, the mechanism */
 .xr-caps{position:absolute;left:var(--gut);bottom:12vh;width:min(40ch,calc(100% - 2*var(--gut)))}
@@ -495,6 +495,7 @@ section[id]{scroll-margin-top:78px}
 .gl .gate{grid-template-columns:34px 56px 150px minmax(0,1fr)}
 .gl .gate .ev{grid-column:4;margin-top:16px;max-width:440px}
 .gl .machine-note{grid-template-columns:34px 56px 150px minmax(0,1fr)}
+.motion .machine-out{padding:24px 0 150px}
 .gl .gate.focus::before{background:var(--text);border-color:var(--text)}
 .gl .gate.model.focus::before{background:var(--hold);border-color:var(--hold)}
 
@@ -515,8 +516,8 @@ section[id]{scroll-margin-top:78px}
 
 /* the invitation — the clean path */
 .stage-cta{display:none}
-.gl .final-side{display:grid;gap:34px}
-.gl .stage-cta{display:block;aspect-ratio:16/10}
+.gl .stage-cta{display:block;aspect-ratio:21/8;margin-bottom:64px}
+.gl .final{padding-top:120px}
 .gl .final .trace .tr,.gl .final .trace .cutline{opacity:.3;transition:opacity .5s ease}
 .gl .final .trace .lit{opacity:1}
 
@@ -559,17 +560,20 @@ section[id]{scroll-margin-top:78px}
   .gl .ro .k{font-size:9px}
   .gl .ro .s{display:none}
   .xr-index{top:calc(58px + 16px)}
-  .xr-caps{bottom:calc(12vh + 64px)}
+  .xr-caps{bottom:7vh}
   .xr-cap p{font-size:15px}
   .lab.evd{font-size:11px}
   .lab.sans{font-size:14px}
+  .gl .gate{grid-template-columns:34px minmax(0,1fr)}
+  .gl .gate .ev{grid-column:2;max-width:none}
+  .gl .machine-note{grid-template-columns:34px minmax(0,1fr)}
   .gl .dive{display:flex;flex-direction:column}
   .gl .stage-dive{order:-1;position:sticky;top:58px;height:34svh;min-height:220px;max-height:340px;margin:24px 0 8px;width:100%}
-  .gl .stage-dive .dive-index{top:8px;right:0}
+  .gl .stage-dive .dive-index{bottom:8px;right:0}
   .gl .replay{grid-template-columns:minmax(0,1fr);grid-template-areas:"stage" "states" "claims" "media"}
   .gl .stage-kill{position:sticky;top:58px;aspect-ratio:auto;height:34svh;min-height:220px;max-height:340px;z-index:3}
   .motion .st{padding-bottom:40px}
-  .gl .final-side{gap:26px}
+  .gl .stage-cta{aspect-ratio:16/10;margin-bottom:40px}
   .handoff{flex-direction:column;max-width:none}
   .ho-link{flex:0 0 28px;width:1px;margin-left:14px}
   .ho-link::before{left:0;right:auto;top:0;bottom:0;width:1px;height:auto}
@@ -577,7 +581,13 @@ section[id]{scroll-margin-top:78px}
   .ho-cut{width:auto;height:1px;border-left:0;border-top:1px dashed var(--hold);margin:10px 0 16px}
   .ho-cut b{left:0;bottom:calc(100% + 6px);transform:none}
 }
-@media (max-height:620px){
+@media (max-height:700px){
+  .gl .readout{padding-bottom:16px}
+  .gl .ro{padding-top:12px}
+  .gl .ro .v{font-size:22px;margin-top:8px}
+  .gl .ro .s{display:none}
+}
+@media (max-height:540px){
   .gl .readout{display:none}
 }
 @media (prefers-reduced-motion:reduce){
@@ -1289,6 +1299,7 @@ window.fillResults = function(values){
   const Y_FLOOR = -.8;                      /* top of the substrate */
   const STOP_X = .78;                       /* the packet's nose at .93; gate 02's front face is at .96 */
   const GATE_NAMES = ['01 · scope', '02 · value', '03 · limits', '04 · exactly once', '05 · purpose · model · off by default', '06 · provenance'];
+  const GATE_SHORT = ['01 · scope', '02 · value', '03 · limits', '04 · exactly once', '05 · purpose · model', '06 · provenance'];
   const gateW = i => 1.8 * (1 - .04 * i), gateH = i => 1.5 * (1 - .04 * i);   /* apertures only ever narrow */
   const G5_LIFT = .78;                      /* gate 05 sits clear of the path: the packet passes beneath it */
   const motion = root.classList.contains('motion');
@@ -1396,7 +1407,7 @@ window.fillResults = function(values){
       this.set(this.dormant);
     }
     set(act){
-      if (Math.abs(act - this.act) < 1e-4) return; this.act = act;
+      this.act = act;
       if (this.mat){ this.mat.opacity = lerp(.55, 1, act); this.mat.color.lerpColors(this.fillLow, this.fillHigh, smooth(act)); }
       if (this.edgeMat){ this.edgeMat.opacity = lerp(.22, .95, act); this.edgeMat.color.lerpColors(this.edgeLow, this.edgeHigh, smooth(act)); }
     }
@@ -1444,7 +1455,7 @@ window.fillResults = function(values){
           const L = new Layer(x, null, { dormant: .5 });
           const dash = dashRect(gateW(i), gateH(i), mat.solid(C.hold, .9), .1, .07, .024); L.dashMat = dash.material;
           L.group.add(dash); L.group.position.y = G5_LIFT;
-          L.set = function(act){ if (Math.abs(act - this.act) < 1e-4) return; this.act = act; this.dashMat.opacity = lerp(.5, 1, act); };
+          L.set = function(act){ this.act = act; this.dashMat.opacity = lerp(.5, 1, act); };
           L.set(.5); L.model = true; g.add(L.group); return L;
         }
         const L = new Layer(x, frameGeo(gateW(i), gateH(i), .07, .08));
@@ -1460,10 +1471,10 @@ window.fillResults = function(values){
       this.barALen = 1.5; this.barBLen = 1.5 * 189900 / 4800000;
       this.endstop = bar(mat.solid(C.block, 0), .02, .1, .1); this.endstop.position.set(.95, 0, 0); this.endstop.material.fog = false; g.add(this.endstop);
       /* the read-only resolve: leaves gate 02, touches the rail's flank, and comes back. Never the terminal. */
-      this.probe = drawnLine([V3(1, .72, 0), V3(1.15, .9, .55), V3(X.rail - .8, .95, 1.0), V3(X.rail, .55, 1.05)], mat.dashedLine(C.muted, .8)); g.add(this.probe);
+      this.probe = drawnLine([V3(1, .72, 0), V3(1.15, .9, .55), V3(X.rail - .8, .95, 1.0), V3(X.rail, .55, 1.05)], mat.dashedLine(C.text, .9)); g.add(this.probe);
       this.probe.material.fog = false;
       /* the verification read-back: from the rail's flank back to the intent */
-      this.verify = drawnLine([V3(X.rail, .55, 1.05), V3(X.rail - .5, .95, 1.0), V3(X.intent + .3, .9, .7), V3(X.intent, .32, .46)], mat.dashedLine(C.muted, .8)); g.add(this.verify);
+      this.verify = drawnLine([V3(X.rail, .55, 1.05), V3(X.rail - .5, .95, 1.0), V3(X.intent + .3, .9, .7), V3(X.intent, .32, .46)], mat.dashedLine(C.text, .9)); g.add(this.verify);
       /* hit planes for hover — never drawn */
       this.hits = X.gates.map((x, i) => { const m = new THREE.Mesh(planeYZ(1.9, 1.6), new THREE.MeshBasicMaterial({ visible: false })); m.position.set(x, i === 4 ? G5_LIFT : 0, 0); m.userData.gate = i; g.add(m); return m; });
       /* intent: a block rooted in the substrate — the durable object. rail: a terminal frame on two long bars, on no ground of ours */
@@ -1533,18 +1544,18 @@ window.fillResults = function(values){
       this.procFillMat = mat.plane(C.muted, .03); const procFill = new THREE.Mesh(planeYZ(1.68, 1.38), this.procFillMat); procFill.position.copy(this.proc.position); g.add(procFill);
       this.packetMat = mat.solid(C.text, 1); this.packet = new THREE.Mesh(new THREE.BoxGeometry(.3, .06, .06), this.packetMat); this.packetHome = V3(.05, 1.0, 0); this.packet.position.copy(this.packetHome); g.add(this.packet);
       /* the rail, beyond the disk: a terminal frame on two bars */
-      const railGeo = frameGeo(1.4, .7, .05, .06);
-      this.rail = new Layer(2.9, railGeo, { dormant: .25 }); this.rail.group.position.y = .35;
+      const RX = this.RX = 2.55; const railGeo = frameGeo(1.4, .7, .05, .06);
+      this.rail = new Layer(RX, railGeo, { dormant: .25 }); this.rail.group.position.y = .35;
       const rb = new THREE.BoxGeometry(.04, .04, 2.2); const r1 = new THREE.Mesh(rb, this.rail.mat), r2 = new THREE.Mesh(rb, this.rail.mat); r1.position.y = .35; r2.position.y = -.35; this.rail.group.add(r1, r2); g.add(this.rail.group);
       this.terminalMat = mat.edge(C.hold, 0); this.terminal = edges(railGeo, this.terminalMat); this.terminal.position.copy(this.rail.group.position); g.add(this.terminal);
       /* lines: the write (fsync) down to the record, the call toward the rail, the read up from the disk at boot, six reconciliation passes */
       this.write = drawnLine([this.packetHome.clone(), V3(-.4, .52, 0)], mat.edge(C.text, .8), 24); g.add(this.write);
-      this.callEnd = V3(2.9 - .7, .5, 0);
+      this.callEnd = V3(RX - .7, .5, 0);
       this.call = drawnLine([this.packetHome.clone(), V3(1.2, .95, 0), this.callEnd.clone()], mat.edge(C.text, .8), 60); g.add(this.call);
       this.ghostCall = drawnLine([this.packetHome.clone(), V3(1.2, .95, 0), this.callEnd.clone()], mat.edge(C.dim, .12), 60); g.add(this.ghostCall);
       this.read = drawnLine([V3(-.4, .5, 0), V3(-.2, .95, 0), V3(.05, 1.0, 0)], mat.dashedLine(C.muted, .8), 24); g.add(this.read);
       this.probes = [];
-      for (let i = 0; i < 6; i++){ const l = drawnLine([V3(.05, 1.5 - i * .04, 0), V3(1.3, 1.62 - i * .05, -.4 - i * .12), V3(2.9, .72, -.95 - i * .06)], mat.dashedLine(C.muted, .85), 64); this.probes.push(l); g.add(l); }
+      for (let i = 0; i < 6; i++){ const l = drawnLine([V3(.05, 1.5 - i * .04, 0), V3(1.2, 1.6 - i * .05, -.35 - i * .1), V3(RX, .72, -.9 - i * .05)], mat.dashedLine(C.text, .85), 64); this.probes.push(l); g.add(l); }
       /* the lease: a small bar on the record's top face */
       this.leaseMat = mat.solid(C.muted, 0); this.lease = bar(this.leaseMat, .6, .02, .02); this.lease.position.set(-.55, .51, .36); g.add(this.lease);
       this.leaseGhostMat = mat.edge(C.hold, 0); this.leaseGhost = edges(new THREE.BoxGeometry(.6, .02, .02), this.leaseGhostMat); this.leaseGhost.position.copy(this.lease.position); g.add(this.leaseGhost);
@@ -1626,8 +1637,8 @@ window.fillResults = function(values){
   const byKind = k => slots.find(s => s.kind === k);
 
   /* the whole mechanism, framed: distance follows the slot's aspect so the stack fits either way */
-  function revealCam(aspect, fov = 38){
-    const half = 9.3, t = Math.tan(fov / 2 * Math.PI / 180);
+  function revealCam(aspect, fov = 38, half = 9.3){
+    const t = Math.tan(fov / 2 * Math.PI / 180);
     const d = aspect >= 1 ? half / (t * aspect) * 1.04 : half / t * 1.06;
     const dir = V3(.05, .32, .95).normalize().multiplyScalar(Math.min(d, 70));
     return [.6 + dir.x, -.1 + dir.y, dir.z];
@@ -1662,6 +1673,13 @@ window.fillResults = function(values){
     [0.92, { cam: [0, 0, 0], tgt: [.6, -.1, 0], fov: 38, fog: .018, aAgent: .6, aProxy: .8, aMandate: .7, aG: [.7, 1, .32, .32, .5, .32] }],
     [1.00, {}],
   ]);
+  const rideC = px => ({ cam: [px - .7, .9, 2.8], tgt: [px + .15, -.1, 0] });
+  const heroKeysCoarse = keyframes(heroKeys.map(k => {
+    const v = Object.assign({}, k.v);
+    if (k.p <= .40 && v.packetX !== undefined) Object.assign(v, rideC(k.p === 0 ? X.agent : v.packetX));
+    if (k.p >= .47 && k.p <= .80){ v.cam = [-1.6, 1.25, 3.6]; v.tgt = [1.5, -.1, 0]; v.fov = 40; }
+    return [k.p, v];
+  }));
   const heroCaps = [['proxy', .13, .27], ['stop', .70, .84], ['reveal', .92, 1.01]];
   const heroIndex = [[0, 'ai agent'], [.10, 'mcp transport'], [.19, 'interlock proxy'], [.27, 'mandate'], [.33, 'gate 01 · scope'], [.41, 'gate 02 · value'], [.48, 'gate 02 · resolving'], [.59, 'gate 02 · evidence'], [.70, 'gate 02 · block'], [.84, 'the stack']];
   const heroLabelDefs = () => [
@@ -1676,51 +1694,52 @@ window.fillResults = function(values){
     { key: 'g0', cls: 'hi', html: '01 · scope', anchor: V3(0, gateH(0) / 2, 0), align: 'c', valign: 'b', dy: -10 },
     { key: 'g0pass', cls: 'hi', html: '<i class="tick"></i>pass', anchor: V3(0, -gateH(0) / 2, 0), align: 'c', dy: 12 },
     { key: 'g1', cls: 'hi', html: '02 · value', anchor: V3(1, gateH(1) / 2, 0), align: 'c', valign: 'b', dy: -10 },
-    { key: 'probe', cls: 'evd hi', html: '<span class="k">read-only client</span>resolve <b>order_A8841</b> from the rail', anchor: V3(4.2, .95, 1.0), align: 'c', valign: 'b', dy: -8 },
+    { key: 'probe', cls: 'evd hi', html: '<span class="k">read-only client</span>resolve <b>order_A8841</b> from the rail', anchor: V3(3.0, .93, .95), align: 'c', dy: 10 },
     { key: 'ev1', cls: 'evd', html: '<span class="k">resolved_order</span><b>order_A8841</b>', anchor: V3(1, gateH(1) / 2, .9), dx: 14, dy: -6, valign: 'b' },
     { key: 'ev2', cls: 'evd', html: '<span class="k">order_amount_minor</span><b>4800000</b> → ₹48,000', anchor: V3(1, .3, .78), dx: 14, valign: 'm' },
-    { key: 'ev3', cls: 'evd', html: '<span class="k">claimed_line_item_minor</span><b>189900</b> → ₹1,899 · the authority', anchor: V3(1, .05, .78), dx: 14, valign: 'm' },
+    { key: 'ev3', cls: 'evd', html: coarse ? '<span class="k">claimed_line_item_minor</span><b>189900</b> → ₹1,899' : '<span class="k">claimed_line_item_minor</span><b>189900</b> → ₹1,899 · the authority', anchor: V3(1, .05, .78), dx: 14, valign: 'm' },
     { key: 'ev4', cls: 'evd', html: '<span class="k">return_record</span>null', anchor: V3(1, -.25, .78), dx: 14, valign: 'm' },
     { key: 'verdict', cls: 'chip', html: 'VALUE_NOT_AUTHORISED <i>block</i>', anchor: V3(1, gateH(1) / 2, 0), align: 'c', valign: 'b', dy: -10 },
-    { key: 'never', html: 'gates 03–06 · never ran', anchor: V3(3.5, gateH(3) / 2 + .1, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'never', html: 'gates 03–06 · never ran', anchor: V3(3.9, gateH(3) / 2 + .1, 0), align: 'c', valign: 'b', dy: -10 },
     { key: 'intent', html: 'intent · never written', anchor: V3(X.intent, .32, 0), align: 'c', valign: 'b', dy: -10 },
     { key: 'rail', cls: 'hi', html: 'rail · call 0', anchor: V3(X.rail, .55, 0), align: 'c', valign: 'b', dy: -10 },
-    { key: 'egress', html: 'upstream mcp · your existing server', anchor: V3(X.egress, .9, 0), align: 'c', valign: 'b', dy: -8 },
+    { key: 'egress', html: 'upstream mcp', anchor: V3(X.egress, Y_FLOOR, 0), align: 'c', dy: 10 },
   ];
 
   /* ── dive: inspection of the machine, one layer at a time ── */
   const diveLabelDefs = () => [
     { key: 'proxy', cls: 'hold', html: 'ai stops here', anchor: V3(X.proxy, 1.42, 0), align: 'c', valign: 'b', dy: -10 },
     { key: 'mandate', cls: 'hi', html: 'mandate', anchor: V3(X.mandate, .875, 0), align: 'c', valign: 'b', dy: -10 },
-    ...X.gates.map((x, i) => ({ key: 'g' + i, cls: i === 4 ? 'hold' : 'hi', html: GATE_NAMES[i], anchor: V3(x, i === 4 ? G5_LIFT + gateH(i) / 2 : gateH(i) / 2, 0), align: 'c', valign: 'b', dy: -10 })),
-    { key: 'g4note', cls: 'hold evd', html: '<span class="k" style="color:var(--hold)">not in the path</span>advisory · can hold or block · can never allow', anchor: V3(4, G5_LIFT - gateH(4) / 2, 0), align: 'c', dy: 12 },
+    ...X.gates.map((x, i) => ({ key: 'g' + i, cls: i === 4 ? 'hold' : 'hi', html: GATE_SHORT[i], anchor: V3(x, i === 4 ? G5_LIFT + gateH(i) / 2 : gateH(i) / 2, 0), align: 'c', valign: 'b', dy: -10 })),
+    { key: 'g4long', cls: 'hold', html: GATE_NAMES[4], anchor: V3(4, G5_LIFT + gateH(4) / 2, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'g4note', cls: 'hold evd', html: '<span class="k" style="color:var(--hold)">not in the path</span>advisory · can hold or block<br>can never allow', anchor: V3(4, G5_LIFT - gateH(4) / 2, .8), dx: 10, dy: 6 },
     { key: 'intent', cls: 'hi', html: 'durable intent', anchor: V3(X.intent, .32, 0), align: 'c', valign: 'b', dy: -10 },
     { key: 'rail', cls: 'hi', html: 'rail · at most once', anchor: V3(X.rail, .55, 0), align: 'c', valign: 'b', dy: -10 },
     { key: 'out', cls: 'ok', html: '<i class="tick"></i>outcome verified', anchor: V3(X.rail, -.5, 0), align: 'c', dy: 12 },
     { key: 'egress', html: 'upstream mcp', anchor: V3(X.egress, .9, 0), align: 'c', valign: 'b', dy: -8 },
   ];
   const diveCamFor = (i, aspect) => {
-    if (i < 0) return { cam: revealCam(aspect), tgt: [.6, -.1, 0], fov: 38, fog: .018 };
-    if (i >= 6) return { cam: [X.intent - 1.2, 1.5, 4.8], tgt: [X.intent + 1.1, -.05, 0], fov: 38, fog: .025 };
-    const x = X.gates[i], y = i === 4 ? .35 : 0; return { cam: [x - 1.2, 1.35 + y, 3.9], tgt: [x + .3, -.05 + y, 0], fov: 38, fog: .025 };
+    if (i < 0) return { cam: [-3.4, 1.9, 6.2], tgt: [2.2, -.1, 0], fov: 38, fog: .026 };
+    if (i >= 6) return { cam: [X.intent - 1.7, 1.6, 5.2], tgt: [X.intent + 1.1, -.05, 0], fov: 36, fog: .025 };
+    const x = X.gates[i], y = i === 4 ? .38 : 0; return { cam: [x - 1.6, 1.55 + y, 5.0], tgt: [x + .35, -.05 + y, 0], fov: 36, fog: .025 };
   };
 
   /* ── act II ── */
   const killLabelDefs = () => [
-    { key: 'state', cls: 'big', html: 'PROPOSED', anchor: V3(-1.0, .5, .31), align: 'l', valign: 'b', dy: -22 },
+    { key: 'state', cls: 'big', html: 'PROPOSED', anchor: V3(-.55, 0, .62), align: 'c', dy: 14 },
     { key: 'disk', html: 'on disk · sqlite · write-ahead log', anchor: V3(-2.3, 0, 1.4), dy: 10 },
     { key: 'proc', cls: 'hi', html: 'process', anchor: V3(.05, 1.5, 0), align: 'c', valign: 'b', dy: -8 },
     { key: 'dead', cls: 'bad', html: 'process terminated · kill -9', anchor: V3(.05, 1.5, 0), align: 'c', valign: 'b', dy: -8 },
     { key: 'boot', cls: 'hi', html: 'new process · boot', anchor: V3(.05, 1.5, 0), align: 'c', valign: 'b', dy: -8 },
-    { key: 'rail', cls: 'hi', html: 'rail', anchor: V3(2.9, .72, 0), align: 'c', valign: 'b', dy: -10 },
-    { key: 'fsync', cls: 'evd hi', html: '<span class="k">write-ahead</span>fsynced <b>before</b> the call', anchor: V3(-.4, .52, 0), dx: 14, dy: 4 },
+    { key: 'rail', cls: 'hi', html: 'rail', anchor: V3(2.55, .72, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'fsync', cls: 'evd hi', html: '<span class="k">write-ahead</span>fsynced <b>before</b> the call', anchor: V3(-.2, .8, 0), dx: 12, valign: 'm' },
     { key: 'lease', html: 'lease · +30s', anchor: V3(-.25, .51, .36), dx: 10, valign: 'm' },
     { key: 'lease0', cls: 'hold', html: 'lease expired', anchor: V3(-.25, .51, .36), dx: 10, valign: 'm' },
     { key: 'call', cls: 'hi', html: 'rail call · in flight', anchor: V3(1.2, .95, 0), align: 'c', valign: 'b', dy: -10 },
     { key: 'unknown', cls: 'hold', html: 'did the rail act? unknown', anchor: V3(1.2, .95, 0), align: 'c', valign: 'b', dy: -10 },
     { key: 'found', cls: 'evd hi', html: '<span class="k">found on disk at boot</span>not retried', anchor: V3(-.2, .95, 0), dx: -14, align: 'r', valign: 'm' },
-    { key: 'probe', cls: 'hold', html: 'reconciling · ×<b data-n>1</b> · pages read, nothing found', anchor: V3(1.3, 1.62, -.4), align: 'c', valign: 'b', dy: -10 },
-    { key: 'quar', cls: 'bad', html: 'quarantined · a named human decides', anchor: V3(-.55, 0, .62), align: 'c', dy: 14 },
+    { key: 'probe', cls: 'hold', html: 'reconciling · ×<b data-n>1</b> · pages read, nothing found', anchor: V3(1.2, 1.6, -.35), align: 'c', valign: 'b', dy: -10 },
+    { key: 'quar', cls: 'bad', html: 'a named human decides', anchor: V3(-.55, 0, .62), align: 'c', dy: 54 },
   ];
   /* one pose per state, sub-beats from the fraction scrolled through that state's row */
   function killPose(i, f){
@@ -1735,7 +1754,7 @@ window.fillResults = function(values){
     if (i >= 5){ s.proc = 1; s.read = 1; }
     if (i >= 6){ s.parallax = .5; }
     if (i === 6){ s.probes = f * 6; }
-    if (i >= 7){ s.probes = 7; s.quarantine = 1; s.terminal = .35; s.terminalHold = 0; s.proc = .3; s.read = 0; }
+    if (i >= 7){ s.probes = 7; s.quarantine = 1; s.terminal = .35; s.terminalHold = 0; s.proc = .3; s.read = 0; s.leaseExpired = 0; }
     return s;
   }
   const KILL_STATE = ['PROPOSED', 'AUTHORIZED', 'IN_FLIGHT', 'IN_FLIGHT', 'UNKNOWN', 'UNKNOWN', 'RECONCILING', 'QUARANTINED'];
@@ -1745,9 +1764,9 @@ window.fillResults = function(values){
   const ctaLabelDefs = () => [
     { key: 'packet', cls: 'txt', html: 'create_refund · ₹2,800', anchor: V3(), dy: -12, align: 'c', valign: 'b' },
     { key: 'g4', cls: 'hold', html: '05 · off by default · not in the path', anchor: V3(4, G5_LIFT + gateH(4) / 2, 0), align: 'c', valign: 'b', dy: -10 },
-    { key: 'call1', cls: 'hi', html: 'rail · call 1', anchor: V3(X.rail, .55, 0), align: 'c', valign: 'b', dy: -10 },
-    { key: 'applied', cls: 'big ok', html: 'APPLIED<small style="color:var(--allow)">verified against the ledger</small>', anchor: V3(X.rail, -.55, 0), align: 'c', dy: 16 },
-    { key: 'intent', cls: 'hi', html: 'intent · fsynced first', anchor: V3(X.intent, .32, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'call1', cls: 'hi', html: 'rail · called once', anchor: V3(X.rail, .55, .9), align: 'r', dx: -6, valign: 'b', dy: -10 },
+    { key: 'applied', cls: 'big ok', html: 'APPLIED<small style="color:var(--allow)">verified against the ledger</small>', anchor: V3(X.rail, -.55, .9), align: 'r', dx: -6, dy: 16 },
+    { key: 'intent', cls: 'hi', html: 'intent · fsynced first', anchor: V3(X.intent, .32, -.5), align: 'r', dx: -10, valign: 'b', dy: -10 },
   ];
   const CTA_PATH = [[0, X.agent], [.22, X.proxy], [.30, X.mandate], [.70, 5], [.74, X.intent], [.86, X.rail]];
   const ctaX = q => { for (let i = 0; i < CTA_PATH.length - 1; i++){ const [qa, xa] = CTA_PATH[i], [qb, xb] = CTA_PATH[i + 1]; if (q <= qb) return lerp(xa, xb, range(q, qa, qb)); } return X.rail; };
@@ -1793,8 +1812,8 @@ window.fillResults = function(values){
       const cr = cta.el.getBoundingClientRect();
       const maxScroll = document.documentElement.scrollHeight - this.vh;
       const restTop = cr.top - (maxScroll - scrollY);
-      const denom = this.vh - restTop;
-      this.ctaQ = denom > 40 ? clamp((this.vh - cr.top) / denom) : 1;
+      const span = Math.min(1.1 * cr.height, .9 * this.vh - restTop);
+      this.ctaQ = span > 40 ? clamp((.9 * this.vh - cr.top) / span) : 1;
     }
   };
 
@@ -1802,10 +1821,16 @@ window.fillResults = function(values){
   const tmpV = V3();
   const vertical = aspect => aspect < 1;
   function heroTarget(s, p, aspect){
-    const k = sampleKeys(heroKeys, p);
-    if (p > .80){ const t = range(p, .80, .92); const rc = revealCam(aspect); const a = sampleKeys(heroKeys, .80).cam; k.cam = [lerp(a[0], rc[0], t), lerp(a[1], rc[1], t), lerp(a[2], rc[2], t)]; }
-    if (!motion){ k.cam = revealCam(aspect); k.tgt = [aspect >= 1 && !coarse ? 3.0 : .6, -.1, 0]; k.shutter = 1; k.barA = 1; k.barB = 1; k.packetX = STOP_X; k.ghost = 0; k.parsed = 1; k.fog = .018; }
+    const keys = coarse ? heroKeysCoarse : heroKeys;
+    const k = sampleKeys(keys, p);
+    if (p > .80){ const t = range(p, .80, .92); const rc = revealCam(aspect, 38, vertical(aspect) ? 10.6 : 9.3); const a = sampleKeys(keys, .80).cam; k.cam = [lerp(a[0], rc[0], t), lerp(a[1], rc[1], t), lerp(a[2], rc[2], t)]; }
+    if (!motion){
+      /* a still: the copy holds the left of the stage, so the frame is shifted so the membrane-to-rail span sits on the right */
+      const wide = aspect >= 1 && !coarse; const dx = wide ? -3.0 : 0; const rc = revealCam(aspect, 38, wide ? 12.4 : 9.3);
+      k.cam = [rc[0] + dx, rc[1], rc[2]]; k.tgt = [.6 + dx, -.1, 0]; k.shutter = 1; k.barA = 1; k.barB = 1; k.packetX = STOP_X; k.ghost = 0; k.parsed = 1; k.fog = .016;
+    }
     const v = vertical(aspect) ? smooth(range(p, .80, .96)) : 0; k.up = [-v, 1 - v, 0];
+    if (v > 0){ k.cam[0] += 1.9 * v; k.tgt[0] += 1.9 * v; k.cam[1] -= .5 * v; k.tgt[1] -= .5 * v; }
     if (!motion && vertical(aspect)) k.up = [-1, 0, 0];
     return k;
   }
@@ -1814,9 +1839,9 @@ window.fillResults = function(values){
     const on = (k, a, b) => { if (p >= a && p < b) show.add(k); };
     on('agent', 0, .17); on('pSans', 0, .225); on('pMono', .225, .70); on('pBad', .70, .84); on('pBad2', .84, 1.01);
     on('proxy', .12, .27); on('det', .215, .30); on('mandate', .255, .37); on('g0', .31, .45); on('g0pass', .355, .47); on('g1', .40, .59);
-    on('probe', .485, .555); on('ev1', .565, .84); on('ev2', .605, .84); on('ev3', .64, .84); on('ev4', .665, .84);
-    on('verdict', .70, 1.01); on('never', .83, 1.01); on('intent', .86, 1.01); on('rail', .885, 1.01); on('proxy', .84, 1.01); on('egress', .90, 1.01);
-    if (!motion){ show.clear(); ['pBad2', 'proxy', 'mandate', 'g0', 'g1', 'verdict', 'never', 'intent', 'rail', 'ev3'].forEach(k => show.add(k)); }
+    on('probe', .485, .555); on('ev1', .565, .84); on('ev3', .64, .84); if (!coarse){ on('ev2', .605, .84); on('ev4', .665, .84); }
+    on('verdict', .70, 1.01); on('never', .83, 1.01); on('intent', .86, 1.01); on('rail', .885, 1.01); on('proxy', .84, 1.01); if (!coarse) on('egress', .90, 1.01);
+    if (!motion){ show.clear(); (coarse ? ['pBad2', 'proxy', 'verdict', 'never', 'rail'] : ['pBad2', 'verdict', 'never', 'rail']).forEach(k => show.add(k)); }
     /* the packet's own labels ride with it */
     const pp = stack.packetPos(pose.packetX, tmpV); ['pSans', 'pMono', 'pBad'].forEach(k => s.label(k).anchor.set(pp.x, pp.y + .08, pp.z)); s.label('pBad2').anchor.set(pp.x, pp.y - .08, pp.z);
   }
@@ -1830,7 +1855,7 @@ window.fillResults = function(values){
     let name = heroIndex[0][1]; for (const [a, n] of heroIndex) if (p >= a) name = n;
     if (dom.heroLayer.textContent !== name) dom.heroLayer.textContent = name;
     dom.heroBar.style.width = (p * 100).toFixed(1) + '%';
-    dom.heroIndex.classList.toggle('on', p > .08 && p < .995);
+    dom.heroIndex.classList.toggle('on', p > .08 && p < (coarse ? .86 : .995));
   }
 
   function diveTarget(s, i, aspect){
@@ -1839,20 +1864,20 @@ window.fillResults = function(values){
     k.aG = X.gates.map((x, j) => j === i ? 1 : j === hov ? .85 : (Math.abs(j - i) === 1 ? .55 : .36));
     if (i === 4) k.aG[4] = 1;
     k.aMandate = i < 0 ? .7 : i === 0 ? .6 : .35; k.aIntent = i >= 6 ? 1 : i < 0 ? .5 : .2; k.aRail = i >= 6 ? .9 : i < 0 ? .5 : .2; k.railOk = i >= 6 ? 1 : 0;
-    k.aProxy = i < 0 ? .8 : .4; k.aAgent = i < 0 ? .6 : .3; k.packetOn = 0; k.packetX = X.agent;
-    k.up = [vertical(aspect) ? -1 : 0, vertical(aspect) ? 0 : 1, 0];
+    k.aProxy = i < 0 ? .8 : .4; k.aAgent = i < 0 ? .6 : .3; k.packetOn = 0; k.packetX = X.agent; k.railOk = i >= 6 ? .6 : 0;
+    k.up = [0, 1, 0];
     if (!motion){ k.aG = [1, 1, 1, 1, 1, 1]; k.aMandate = .9; k.aIntent = .9; k.aRail = .9; }
     return k;
   }
   function diveShow(s, i){
     const show = s.show; show.clear();
-    if (!motion || i < 0){ ['proxy', 'mandate', 'g0', 'g1', 'g2', 'g3', 'g4', 'g5', 'intent', 'rail', 'egress'].forEach(k => show.add(k)); return; }
+    if (!motion || i < 0){ ['proxy', 'mandate', 'g0', 'g4', 'rail'].forEach(k => show.add(k)); return; }
     if (i >= 6){ show.add('g5'); show.add('intent'); show.add('rail'); show.add('out'); show.add('egress'); return; }
-    show.add('g' + i); if (i > 0) show.add('g' + (i - 1)); if (i < 5) show.add('g' + (i + 1)); if (i === 0) show.add('mandate'); if (i === 4) show.add('g4note');
+    if (i === 4){ show.add('g4long'); show.add('g4note'); } else show.add('g' + i); if (i === 0) show.add('mandate');
     if (IC.hover >= 0) show.add('g' + IC.hover);
   }
   function diveDom(i){
-    const name = i < 0 ? 'the stack' : i >= 6 ? 'intent · rail' : 'gate ' + GATE_NAMES[i];
+    const name = i < 0 ? 'the stack' : i >= 6 ? 'intent · rail' : 'gate ' + GATE_SHORT[i];
     if (dom.diveLayer.textContent !== name) dom.diveLayer.textContent = name;
     dom.diveBar.style.width = (i < 0 ? 0 : i >= 6 ? 100 : ((i + 1) / 6) * 100) + '%';
     dom.diveIndex.classList.toggle('on', motion);
@@ -1861,7 +1886,7 @@ window.fillResults = function(values){
 
   function killTarget(s, i, frac, aspect){
     const k = killPose(motion ? i : 7, motion ? frac : 1);
-    k.cam = [2.5, 1.9, 4.6]; k.tgt = [.55, .45, 0]; k.fov = 36; k.fog = .02; k.up = [0, 1, 0];
+    k.cam = [3.0, 2.0, 5.4]; k.tgt = [.7, .35, 0]; k.fov = 38; k.fog = .02; k.up = [0, 1, 0];
     return k;
   }
   function killShow(s, i, frac, pose){
@@ -1872,6 +1897,7 @@ window.fillResults = function(values){
     if (i === 2 && frac > .05) show.add('fsync'); if (i >= 2 && i < 4 && (i > 2 || frac > .3)) show.add('lease'); if (i === 2 && frac > .5) show.add('call'); if (i === 3) show.add('unknown');
     if (i >= 4 && i < 7) { show.add('lease0'); } if (i >= 4 && i < 6) { show.add('found'); }
     if (i === 6) show.add('probe'); if (i >= 7) show.add('quar');
+    if (coarse) ['disk', 'lease', 'lease0', 'fsync', 'found', 'call'].forEach(k => show.delete(k));
     const st = s.label('state'); const idx = clamp(i, 0, 7);
     const n = Math.max(1, Math.min(6, Math.ceil(frac * 6 - 1e-6)));
     const txt = KILL_STATE[idx] + (idx === 6 ? ' ×' + n : '');
@@ -1901,7 +1927,7 @@ window.fillResults = function(values){
     const show = s.show; show.clear();
     if (motion && q > .01 && q < .95) show.add('packet');
     if (q > .58 && q < .70) show.add('g4');
-    if (q >= .86) show.add('call1'); if (q >= .74) show.add('intent'); if (q >= .95) show.add('applied');
+    if (q >= .86 && !coarse) show.add('call1'); if (q >= .74 && !coarse) show.add('intent'); if (q >= .95) show.add('applied');
     const pp = stack.packetPos(pose.packetX, tmpV); s.label('packet').anchor.set(pp.x, pp.y + .08, pp.z);
     dom.ctaRows.forEach(r => r.classList.toggle('lit', q >= parseFloat(r.dataset.q)));
   }
@@ -1990,6 +2016,7 @@ window.fillResults = function(values){
     hit.addEventListener('click', e => { const h = pick(e); if (h >= 0 && dom.gates[h]) dom.gates[h].scrollIntoView({ block: 'center', behavior: 'smooth' }); });
   }
 
+  
   rafId = requestAnimationFrame(frame);
   addEventListener('pagehide', () => { if (rafId) cancelAnimationFrame(rafId); });
 })();
