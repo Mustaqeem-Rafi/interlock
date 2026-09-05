@@ -165,6 +165,18 @@ Naming the envelope precisely is the point. An unqualified claim would be the de
 
 ---
 
+## Decisions, and what they cost
+
+Five [architecture decision records](docs/adr/), each with a consequences section:
+
+- **[0001](docs/adr/0001-semantic-idempotency-key.md)** — identity comes from meaning, not from a token the caller invents. A caller-supplied idempotency key protects against the *network* retrying; the caller here is a language model, and a model that has been injected generates a fresh key for its second attempt.
+- **[0002](docs/adr/0002-sqlite-synchronous-by-design.md)** — a synchronous driver, so the ordering "write, then call" is enforced by the language rather than by everyone remembering.
+- **[0003](docs/adr/0003-absence-is-not-absence.md)** — the reconciler may only claim absence it has actually established. Duplicates are a *presence* claim and may be reported from a partial walk; absence may not.
+- **[0004](docs/adr/0004-what-broke-and-how-i-got-out.md)** — the first chaos matrix passed, and it was wrong to. Widening it produced 34 violations and two real bugs, one of which needed no crash at all to reproduce.
+- **[0005](docs/adr/0005-gate-5-is-off-by-default.md)** — why `ALLOW` is not in the advisory verdict union.
+
+---
+
 ## Layout
 
 ```

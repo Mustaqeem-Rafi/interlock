@@ -24,3 +24,11 @@ npm/schema.sql
 npm/README.md
 npm/LICENSE
 npm/examples/
+
+# Planning and working notes. These are mine, not the project's: the handoff in
+# particular carries personal details that have no business in a public repo,
+# and one `git add -A` is all it would take.
+HANDOFF_*.md
+BUILD_ORDER.md
+PROMPTS.md
+what_broke.txt
