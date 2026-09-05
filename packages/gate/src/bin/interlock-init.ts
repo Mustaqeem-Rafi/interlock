@@ -25,6 +25,8 @@ import { MOCK_MANIFEST } from '../proxy/manifest.js';
 
 const VERSION = '0.1.0';
 
+const NL = String.fromCharCode(10);
+
 const HELP = `interlock init ${VERSION}
 
 Draft a mandate from four plain-English answers, then require a human to
@@ -143,11 +145,31 @@ export async function main(argv: readonly string[]): Promise<number> {
   );
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+  /**
+   * readline's question() never settles once the input has ended, so a closed
+   * stdin left this process with nothing left to do and node exited 0 —
+   * reporting success for a run that asked a question, got no answer, and
+   * wrote no mandate. An exit code of 0 has to mean a mandate exists.
+   */
+  const ended = new Promise<undefined>((resolveEnded) => {
+    rl.once('close', () => {
+      resolveEnded(undefined);
+    });
+  });
+  const ask = (prompt: string): Promise<string | undefined> =>
+    Promise.race([rl.question(prompt), ended]);
   try {
     const answers: Record<string, string> = {};
     for (const question of QUESTIONS) {
       process.stdout.write(`${question.help}\n`);
-      const value = (await rl.question(`${question.prompt}\n> `)).trim();
+      const value = (await ask(`${question.prompt}\n> `))?.trim();
+      if (value === undefined) {
+        process.stderr.write(
+          'Input ended before the questions were answered. No mandate was written.' + NL,
+        );
+        return 2;
+      }
       if (value === '') {
         process.stderr.write('An empty answer cannot be turned into a policy. Stopping.\n');
         return 2;
@@ -172,8 +194,10 @@ export async function main(argv: readonly string[]): Promise<number> {
         }
         // Typing the whole word, not pressing enter on a default. This mandate
         // is standing authority to move real money.
-        const answer = await rl.question('\nApprove this mandate? Type "yes" to accept: ');
-        return answer.trim().toLowerCase() === 'yes';
+        const answer = await ask('\nApprove this mandate? Type "yes" to accept: ');
+        // Undefined means the input ended rather than said yes. Silence is not
+        // consent for a document that is standing authority to move money.
+        return answer?.trim().toLowerCase() === 'yes';
       },
       write: (yaml) => {
         writeFileSync(out, yaml, 'utf8');
