@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { InterlockError } from './errors.js';
 
 /**
  * Process configuration, validated once at boot.
@@ -9,13 +10,12 @@ import { z } from 'zod';
  * to; guessing either would be worse than not starting.
  */
 
-export class EnvValidationError extends Error {
+export class EnvValidationError extends InterlockError {
   readonly code = 'ENV_INVALID' as const;
   readonly issues: readonly string[];
 
   constructor(issues: readonly string[]) {
     super(`Invalid environment:\n${issues.map((issue) => `  - ${issue}`).join('\n')}`);
-    this.name = 'EnvValidationError';
     this.issues = issues;
   }
 }
