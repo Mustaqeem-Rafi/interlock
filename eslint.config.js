@@ -1,10 +1,25 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
+// Hand-maintained, and it was short enough that a script using fetch failed
+// lint for using the runtime it targets. These are all Node built-ins.
 const nodeGlobals = {
   console: 'readonly',
   process: 'readonly',
   URL: 'readonly',
+  Buffer: 'readonly',
+  fetch: 'readonly',
+  Response: 'readonly',
+  Request: 'readonly',
+  Headers: 'readonly',
+  AbortSignal: 'readonly',
+  DOMException: 'readonly',
+  setTimeout: 'readonly',
+  clearTimeout: 'readonly',
+  setInterval: 'readonly',
+  clearInterval: 'readonly',
+  TextEncoder: 'readonly',
+  TextDecoder: 'readonly',
 };
 
 export default tseslint.config(
