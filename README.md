@@ -722,6 +722,12 @@ Widening the test matrix along three axes (5 kill points × 5 rail faults × pos
 
 ---
 
+## Deploying
+
+The proxy is installed, not hosted — it speaks MCP on stdio and runs wherever the agent runs. Only the console is a service, and it needs a persistent disk because the ledger *is* the exactly-once guarantee. Blueprint in [`render.yaml`](render.yaml); the reasoning, including why the deployment deliberately holds no rail credential, is in [docs/DEPLOY.md](docs/DEPLOY.md).
+
+---
+
 ## Safety Posture
 
 Test mode only, own keys, own sandbox. Every scenario is drawn from **already-published** failure patterns — AgentDojo, InjecAgent, Invariant Labs, Unit 42. **No new attack technique is invented here.** Scenarios ship as fixtures against our own mock rail rather than as generic attack tooling, and the defence ships in the same repository as the benchmark.
