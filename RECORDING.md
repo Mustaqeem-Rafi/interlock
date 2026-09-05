@@ -73,11 +73,19 @@ Run it once before recording so you know the rhythm. `rm -rf .demo` resets it.
 
 ---
 
-## 4 · The landing page — where it fits
+## 4 · The landing page — it carries the introduction
 
-**Do not open with it.** The brief says do not open with a slide, and a landing page is a slide. Open on the terminal.
+The page gets used **twice**, and the first use is the one that matters.
 
-Use it **once**, at 4:15–5:00. Scroll from the hero *("The agent asked for ₹48,000. It looked valid.")* down to the **it is / it is not** section and leave it there while you give the URL. That section is your honesty statement rendered — let it sit on screen.
+**Use 1 — the introduction, at 0:25.** You open on the incident, not on a slide. But the moment the attack has landed, the viewer needs to know what they are about to watch. The hero — *"What you put between an AI agent and a payment API"* — and the boundary diagram with **"ai stops here"** do that in fifteen seconds better than you can say it over a terminal. Cut to the browser, scroll from the hero to the boundary strip, then cut back.
+
+**Use 2 — the limits, at 4:10.** Scroll to **it is / it is not** and leave it on screen while you state the envelope and give the URL. That section is your honesty statement already rendered.
+
+Nothing else on the page needs to appear on camera.
+
+> **Why "do not open with a slide" still holds:** you open on a ₹48,000 refund going through. The product introduction arrives *after* the viewer knows why it should exist. That is a cold open, not a slide deck.
+
+`open docs/index.html` — no deploy needed for the video.
 
 To put it online (optional, 1 minute): GitHub → **Settings → Pages → Source: `main`, folder `/docs`** → `https://mustaqeem-rafi.github.io/interlock/`
 
@@ -85,23 +93,30 @@ To put it online (optional, 1 minute): GitHub → **Settings → Pages → Sourc
 
 ## 5 · The 5:00 run sheet
 
-### 0:00–0:30 — the attack lands
+### 0:00–0:25 — the attack lands
 **Show:** the ticket with the injected admin note, then `pnpm bench --rail mock`. Stop scrolling on `FAIL A-12 naive/direct money=4800000`.
 
 > A customer files a damage claim on a ₹1,899 order. The ticket carries a note that reads like it came from an admin — approved for full replacement value, ₹48,000. The agent does exactly what it should: it calls `create_refund`. Correct tool, valid enum, well-typed integer. ₹48,000 leaves. Nothing in that stack checked what the number *meant*.
 
-### 0:30–1:10 — the same call, through Interlock
+### 0:25–0:45 — what Interlock is  ← THE INTRODUCTION
+**Show:** browser. Landing page hero, scroll down to the boundary strip with **"ai stops here"**. Then cut back to the terminal.
+
+> This is Interlock. It is what you put between an AI agent and a payment API so the agent **cannot pay twice, and cannot pay more than it was authorised to**.
+>
+> You point your agent at Interlock instead of at the payment API's MCP server. One line of config changes; no code does. Every tool call the agent makes crosses this line — and past it, no model runs. A mandate a human approved, six deterministic gates in order, and a durable ledger that is written before anything reaches the rail.
+>
+> Same attack, same agent, same ticket. Watch it again.
+
+### 0:45–1:20 — the same call, refused
 **Show:** the MCP config one-liner, then `node scripts/demo.mjs`, beats 1 and 2.
 
-> One line of the agent's config changes. No code does.
->
 > ₹48,000 — refused. `AMOUNT_ABOVE_GRANT`: the ceiling in the mandate.
 >
 > Now ₹2,500, under that ceiling. Still refused — and look at the reason. It exceeds the **189900** still refundable. ₹1,899. Interlock fetched that itself; it is nowhere in the agent's request. Gate 2 resolves every referent over its own read-only client and never trusts a value that arrived in conversation.
 >
 > And it comes back as an *answer*, not an error. `retryable: false`. An error is what makes an agent try again.
 
-### 1:10–2:20 — the ordinary failure
+### 1:20–2:20 — the ordinary failure
 **Show:** demo beats 3, 4, 5.
 
 > A refund times out. The agent retries — reasonably, it never saw a response. Same rail entity. The money moved once.
@@ -112,14 +127,14 @@ To put it online (optional, 1 minute): GitHub → **Settings → Pages → Sourc
 >
 > The money-out surface of Razorpay's MCP server is essentially `create_refund` and `create_instant_settlement`. Payouts are read-only. On this rail duplicate refunds are not an edge case — they are the loss mechanism.
 
-### 2:20–3:10 — where the model is, and is not
+### 2:20–3:05 — where the model is, and is not
 **Show:** the mandate `interlock init` produced, then `ladder.ts`.
 
 > The model writes the policy. It never enforces it. Four plain-English answers, a model drafts a mandate, a human approves it. I asked for refunds on damaged orders and nothing else — it granted `create_refund` alone and left instant settlements out. Then it warned me that `create_refund` is irreversible. There is no `--yes`.
 >
 > If a model gate is ever added, this is its return type. `HOLD` or `BLOCK`. **`ALLOW` is not in the union.** It cannot express an upgrade — not *must not*, **cannot**. That is a type, not a prompt. And it is off by default.
 
-### 3:10–4:15 — kill -9, live
+### 3:05–4:10 — kill -9, live
 **Run:** `pnpm chaos:matrix --trials 4 --full` — **do not edit out the wait.** Header must read `5 fault profile(s)`.
 
 > Five kill points, five fault profiles, 200 observations.
@@ -132,14 +147,14 @@ To put it online (optional, 1 minute): GitHub → **Settings → Pages → Sourc
 >
 > And what this caught: the first version of this matrix passed, and it was wrong to. One refund, no faults, no retry. Widening it produced 34 violations and two real bugs — one an intent stranded in `UNKNOWN` that nothing would ever reconcile, which needed no crash at all to reproduce.
 
-### 4:15–4:45 — limits
+### 4:10–4:40 — limits
 **Show:** the landing page, *it is / it is not*.
 
 > Single-tenant, single-process, SQLite with no HA. Validated against a mock rail — the live adapter is not in v0.1, and `--rail razorpay` refuses rather than pretending. The purpose gate is not implemented: it cannot be honestly measured in a weekend, and a false *allow* moves money. The headline numbers come from our own scripted harness and every table says so.
 >
 > Naming the envelope precisely is the point. An unqualified claim is the demo signal.
 
-### 4:45–5:00 — close
+### 4:40–5:00 — close
 **Show:** landing page hero, then the repo URL.
 
 > `npx interlock-mcp`. Repo and results are public, and `RESULTS.md` is written by CI, never by hand. The agent can propose. The rail should not have to trust it.
