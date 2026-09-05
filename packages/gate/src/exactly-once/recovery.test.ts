@@ -258,6 +258,29 @@ describe('boot recovery', () => {
     });
   });
 
+  it('reclaims an intent left sitting in UNKNOWN', async () => {
+    // Found by the chaos matrix. A call that ends ambiguously records UNKNOWN
+    // and hands the intent to whoever reconciles next — and nothing did. The
+    // sweep only detects drift and recovery only looked at IN_FLIGHT and
+    // RECONCILING, so the intent sat there with the money already gone.
+    await strandInFlight(1, true);
+    store.intents.transition({
+      merchant_id: MERCHANT,
+      sik: sikFor(1),
+      from: 'IN_FLIGHT',
+      to: 'UNKNOWN',
+      at: (clock += 1),
+      lease: null,
+    });
+    expect(store.intents.require(MERCHANT, sikFor(1)).state).toBe('UNKNOWN');
+
+    const report = await createRecovery({ store, reconciler, now: () => clock }).run();
+
+    expect(report.recovered).toBe(1);
+    expect(store.intents.require(MERCHANT, sikFor(1)).state).toBe('APPLIED');
+    expect(rail.inspect.refundsForPayment(paymentId)).toHaveLength(1);
+  });
+
   it('is ready immediately when there is nothing to recover', async () => {
     const recovery = createRecovery({ store, reconciler, now: () => clock });
     expect(recovery.readiness().status).toBe(503);

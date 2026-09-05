@@ -16,6 +16,7 @@ export {
   RailError,
   RailNotFoundError,
   RailRejectedError,
+  RailResponseMismatchError,
   RailTimeoutError,
   RailUnavailableError,
 } from './errors.js';

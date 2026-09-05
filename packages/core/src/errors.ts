@@ -24,6 +24,7 @@ export type InterlockErrorCode =
   | 'RAIL_DUPLICATE_RECEIPT'
   | 'RAIL_NOT_FOUND'
   | 'RAIL_REJECTED'
+  | 'RAIL_RESPONSE_MISMATCH'
   | 'CHAOS_CONFIG'
   | 'CHAOS_TRIAL_FAILED';
 

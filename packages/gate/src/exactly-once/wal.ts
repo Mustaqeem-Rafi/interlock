@@ -2,7 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { InvariantViolation, sikReceipt, type AttemptOutcome } from '@interlock/core';
 import type { IntentRow, Store } from '@interlock/store';
 import { killAt } from '../kill-points.js';
-import { RailDuplicateReceiptError, RailError } from '../rail/errors.js';
+import {
+  RailDuplicateReceiptError,
+  RailError,
+  RailResponseMismatchError,
+} from '../rail/errors.js';
 import type { Rail, Refund, RefundRequest, RefundSpeed } from '../rail/rail.js';
 import { assertMayIssueRailCall, nextState } from './machine.js';
 
@@ -81,6 +85,17 @@ export function assertStamped(request: RefundRequest, sik: string): void {
       'refund notes are missing interlock_sik; the reconciler could not find this refund',
     );
   }
+}
+
+/**
+ * The response must carry the stamp we sent. Checked on the way back for the
+ * same reason it is stamped on the way out: amount is not an identity, and
+ * neither is "the id the rail happened to return".
+ */
+export function assertResponseIsOurs(refund: Refund, sik: string): void {
+  if (refund.notes['interlock_sik'] === sik) return;
+  if (refund.receipt === sikReceipt(sik)) return;
+  throw new RailResponseMismatchError('createRefund', refund.id, sikReceipt(sik));
 }
 
 export type IssueOutcome =
@@ -174,7 +189,17 @@ export function createWal(options: WalOptions): Wal {
         // The rail adapter fires `during_call` from inside the request.
         const refund = await rail.createRefund(request);
 
+        // Immediately after the call and before anything is done with the
+        // answer: that is what this kill point names, and putting it above the
+        // validation below keeps it reachable when the response is the thing
+        // that is wrong.
         killAt('after_call_before_commit');
+
+        // Trap 3 applied to the response, not just to reconciliation. A rail
+        // that replays a previous body hands back an id belonging to a
+        // different refund, and recording it would point the ledger at somebody
+        // else's money. The stamp is the only thing that identifies ours.
+        assertResponseIsOurs(refund, intent.sik);
 
         store.intents.finishAttempt({
           merchant_id: intent.merchant_id,

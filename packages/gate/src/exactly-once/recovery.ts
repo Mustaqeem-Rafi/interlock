@@ -19,8 +19,18 @@ import type { Reconciler, ReconcileOutcome } from './reconciler.js';
 
 export const RECOVERY_REASON = 'RECOVERED_AFTER_RESTART';
 
-/** States a dead process can leave behind. Both hold a lease; both are stale. */
-const RECOVERABLE = ['IN_FLIGHT', 'RECONCILING'] as const;
+/**
+ * States a dead process can leave behind.
+ *
+ * UNKNOWN is here because the chaos matrix found it missing. A rail call that
+ * ends ambiguously records UNKNOWN and hands the intent to whoever reconciles
+ * next — but nothing did. The periodic sweep only detects drift, boot recovery
+ * only looked at IN_FLIGHT and RECONCILING, and so an intent that reached
+ * UNKNOWN cleanly sat there forever with money possibly gone and nothing ever
+ * going to check. A restart now heals it, which also covers a crash landing in
+ * the window between recording UNKNOWN and reconciling it.
+ */
+const RECOVERABLE = ['IN_FLIGHT', 'RECONCILING', 'UNKNOWN'] as const;
 
 export type RecoveryPhase = 'scanning' | 'reconciling' | 'ready';
 
@@ -120,7 +130,10 @@ export function createRecovery(options: RecoveryOptions): Recovery {
           ? store.intents.list({ states: RECOVERABLE, limit })
           : store.intents.sweepExpiredLeases(now(), { states: RECOVERABLE, limit });
 
-      const recovered = stale.map(toUnknown);
+      // Already UNKNOWN: nothing to move, it just needs reconciling.
+      const recovered = stale.map((intent) =>
+        intent.state === 'UNKNOWN' ? intent : toUnknown(intent),
+      );
       outstanding = recovered.length;
       phase = 'reconciling';
 

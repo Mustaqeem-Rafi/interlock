@@ -5,9 +5,10 @@ import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { InvariantViolation } from '@interlock/core';
 import { openStore, type IntentRow, type NewIntent, type Store } from '@interlock/store';
-import { RailTimeoutError } from '../rail/errors.js';
+import { RailResponseMismatchError, RailTimeoutError } from '../rail/errors.js';
 import { createMockRail, type MockRail } from '../rail/mock.js';
 import { MACHINE_EVENTS, canTransition, nextState } from './machine.js';
+import { createReconciler } from './reconciler.js';
 import { propose } from './propose.js';
 import { LEASE_MS, createWal, stampRefund, type IssueOutcome, type Wal } from './wal.js';
 
@@ -503,6 +504,51 @@ describe('the write-ahead stamp', () => {
     expect(request.receipt).toBe(`ilk_${SIK}`);
     expect(request.notes?.['interlock_sik']).toBe(SIK);
     expect(request.notes?.['memo']).toBe('kept');
+  });
+
+  it('refuses a response that does not carry our stamp', async () => {
+    // Found by the chaos matrix under dup_response: a rail that replays a
+    // previous body hands back an id belonging to a different refund, and a
+    // caller that trusts it points the ledger at somebody else's money.
+    const authorized = authorize(propose(store, newIntent()).intent);
+
+    const impostor = {
+      ...rail,
+      createRefund: async (request: Parameters<MockRail['createRefund']>[0]) => {
+        const ours = await rail.createRefund(request);
+        // Same shape, someone else's stamp.
+        return { ...ours, id: 'rfnd_SOMEONE_ELSE', receipt: 'ilk_OTHER', notes: {} };
+      },
+    };
+
+    const outcome = await createWal({
+      store,
+      rail: impostor,
+      now: () => clock,
+      owner: 'worker-under-test',
+    }).issueRefund(authorized);
+
+    assertKind(outcome, 'UNKNOWN');
+    expect(outcome.error).toBeInstanceOf(RailResponseMismatchError);
+    expect(outcome.intent.state).toBe('UNKNOWN');
+    // Crucially: the impostor's id was not recorded.
+    expect(outcome.intent.rail_entity_id).toBeNull();
+
+    // And reconciliation finds the real one by its stamp.
+    const settled = await createReconciler({
+      store,
+      rail,
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms;
+        return Promise.resolve();
+      },
+    }).settle(outcome.intent);
+    expect(settled.kind).toBe('APPLIED');
+    expect(store.intents.require('acc_KtqXyZ01', SIK).rail_entity_id).toBe(
+      'rfnd_MOCK0000000001',
+    );
+    expect(rail.inspect.refundsForPayment(paymentId)).toHaveLength(1);
   });
 
   it('records an ambiguous outcome as ambiguous, not as a failure', async () => {

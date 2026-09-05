@@ -71,6 +71,31 @@ export class RailDuplicateReceiptError extends RailError {
   }
 }
 
+/**
+ * The rail returned a success body that is not ours.
+ *
+ * Found by the chaos matrix: under dup_response the gateway replays a previous
+ * response, and a caller that trusts the returned id records somebody else's
+ * refund as its own. Ambiguous rather than rejected — our refund may well have
+ * been applied, we simply cannot learn its id from this response, so the only
+ * honest move is to go and look.
+ */
+export class RailResponseMismatchError extends RailError {
+  readonly code = 'RAIL_RESPONSE_MISMATCH' as const;
+  readonly status: number | null;
+  readonly ambiguous = true as const;
+  readonly returned_entity_id: string;
+
+  constructor(operation: string, returnedEntityId: string, expectedReceipt: string) {
+    super(
+      `${operation} returned ${returnedEntityId}, which does not carry receipt ` +
+        `${expectedReceipt}; the response cannot be matched to this request`,
+    );
+    this.status = 200;
+    this.returned_entity_id = returnedEntityId;
+  }
+}
+
 export class RailNotFoundError extends RailError {
   readonly code = 'RAIL_NOT_FOUND' as const;
   readonly status = 404 as const;

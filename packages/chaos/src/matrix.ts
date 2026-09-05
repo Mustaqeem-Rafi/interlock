@@ -6,15 +6,27 @@ import { fileURLToPath } from 'node:url';
 import { KILL_POINTS, type IntentState, type KillPoint } from '@interlock/gate';
 import { ChaosConfigError, ChaosTrialError } from './errors.js';
 import { railStateFiles, readRailState, refundsForSik, writeSeed } from './rail-state.js';
-import { renderResults, totalViolations, type KillPointSummary, type MatrixResults } from './results.js';
-import { judge, type TrialObservation, type Violation } from './verdict.js';
+import {
+  renderResults,
+  totalViolations,
+  type KillPointSummary,
+  type MatrixResults,
+} from './results.js';
+import {
+  FAULT_PROFILES,
+  judge,
+  type FaultProfile,
+  type TrialObservation,
+  type TrialPhase,
+  type Violation,
+} from './verdict.js';
 
 /**
  * The kill-point matrix.
  *
- * Five positions in the money path, N trials each. Every trial is a real
- * process being SIGKILLed and a real process starting up afterwards with
- * nothing but two files to work out what happened.
+ * Five positions in the money path, crossed with rail fault profiles, N trials
+ * each. Every trial is a real process being SIGKILLed and real processes
+ * starting up afterwards with nothing but two files to work out what happened.
  */
 
 const CHILD = fileURLToPath(new URL('./child.js', import.meta.url));
@@ -50,14 +62,19 @@ interface ChildLine {
   readonly ok?: boolean;
   readonly sik?: string;
   readonly state?: IntentState | null;
+  readonly railEntityId?: string | null;
   readonly recovered?: number;
   readonly ready?: boolean;
+  readonly disposition?: string;
   readonly error?: string;
 }
 
 /** The last JSON line a child printed, if it lived long enough to print one. */
 function lastLine(stdout: string): ChildLine | null {
-  const lines = stdout.trim().split('\n').filter((line) => line.trim() !== '');
+  const lines = stdout
+    .trim()
+    .split('\n')
+    .filter((line) => line.trim() !== '');
   const last = lines.at(-1);
   if (last === undefined) return null;
   try {
@@ -111,9 +128,11 @@ function setUpTrial(root: string, index: number): TrialSetup {
 
 async function runTrial(
   killPoint: KillPoint,
+  profile: FaultProfile,
   trial: number,
   root: string,
-): Promise<TrialObservation> {
+  withRetry: boolean,
+): Promise<readonly TrialObservation[]> {
   const setup = setUpTrial(root, trial);
   const base: Record<string, string> = {
     INTERLOCK_DB_PATH: setup.dbPath,
@@ -122,6 +141,13 @@ async function runTrial(
     INTERLOCK_CHAOS_PAYMENT: setup.paymentId,
     INTERLOCK_CHAOS_AMOUNT: String(setup.amountMinor),
     INTERLOCK_CONSOLE_TOKEN: 'chaos-matrix-token-000000000000',
+    INTERLOCK_CHAOS_FAULTS: JSON.stringify(profile.faults),
+    INTERLOCK_CHAOS_DECOY: profile.decoy ? '1' : '0',
+    // Small on purpose: a partitioned trial would otherwise sleep through
+    // 2+4+8+16+32 seconds of real backoff. The ordering is under test, not the
+    // wall clock.
+    INTERLOCK_CHAOS_BACKOFF_CAP: '1',
+    INTERLOCK_CHAOS_MAX_RECON: '3',
   };
 
   // 1. Issue one refund into a process armed to die at `killPoint`.
@@ -136,43 +162,56 @@ async function runTrial(
   const issueLine = lastLine(issued.stdout);
   const killed = issueLine === null || issueLine.ok !== true;
 
-  // 2. Restart. Boot recovery runs to completion before anything else.
-  const recovered = await runGate({
-    ...base,
-    INTERLOCK_CHAOS_MODE: 'recover',
-  });
-  const recoverLine = lastLine(recovered.stdout);
+  // A fault that throws inside the rail call preempts any kill point after it,
+  // so the process surviving there is correct rather than a disarmed matrix.
+  const killExpected = !profile.preempts.includes(killPoint);
 
-  if (recoverLine === null || recoverLine.ok !== true) {
-    throw new ChaosTrialError(
-      `recovery process failed for ${killPoint} trial ${String(trial)}: ` +
-        `${recoverLine?.error ?? recovered.stderr.slice(0, 400)}`,
-    );
-  }
+  const observations: TrialObservation[] = [];
 
-  const sik = recoverLine.sik ?? '';
-  const state = readRailState(railStateFiles(setup.railDir));
-  const entities = refundsForSik(state, sik).map((refund) => refund.id);
-
-  const observation: TrialObservation = {
-    killPoint,
-    trial,
-    sik,
-    railEntities: entities,
-    state: recoverLine.state ?? null,
-    recovered: recoverLine.recovered ?? 0,
-    ready: recoverLine.ready === true,
-    killed,
+  const observe = async (mode: 'recover' | 'retry', phase: TrialPhase): Promise<void> => {
+    const run = await runGate({ ...base, INTERLOCK_CHAOS_MODE: mode });
+    const line = lastLine(run.stdout);
+    if (line === null || line.ok !== true) {
+      throw new ChaosTrialError(
+        `${mode} process failed for ${killPoint}/${profile.name} trial ${String(trial)}: ` +
+          `${line?.error ?? run.stderr.slice(0, 400)}`,
+      );
+    }
+    const sik = line.sik ?? '';
+    const railState = readRailState(railStateFiles(setup.railDir));
+    observations.push({
+      killPoint,
+      profile: profile.name,
+      phase,
+      trial,
+      sik,
+      railEntities: refundsForSik(railState, sik).map((refund) => refund.id),
+      state: line.state ?? null,
+      recordedEntityId: line.railEntityId ?? null,
+      recovered: line.recovered ?? 0,
+      ready: line.ready === true,
+      killed,
+      killExpected,
+      disposition: line.disposition ?? null,
+    });
   };
 
-  // Trials are self-contained; keep the disk from filling on long runs.
+  // 2. Restart, running boot recovery to completion before anything else.
+  await observe('recover', 'recover');
+
+  // 3. The agent asks for the same refund again — the request most likely to
+  //    produce a second one.
+  if (withRetry) await observe('retry', 'retry');
+
   rmSync(setup.root, { recursive: true, force: true });
-  return observation;
+  return observations;
 }
 
 export interface MatrixOptions {
   readonly trials: number;
   readonly killPoints?: readonly KillPoint[];
+  readonly profiles?: readonly FaultProfile[];
+  readonly withRetry?: boolean;
   readonly onTrial?: (observation: TrialObservation, violations: readonly Violation[]) => void;
 }
 
@@ -180,38 +219,65 @@ export async function runMatrix(options: MatrixOptions): Promise<MatrixResults> 
   const startedAt = new Date().toISOString();
   const start = Date.now();
   const points = options.killPoints ?? KILL_POINTS;
+  const profiles = options.profiles ?? [FAULT_PROFILES[0]!];
+  const withRetry = options.withRetry ?? false;
   const root = mkdtempSync(join(tmpdir(), 'interlock-chaos-'));
   const summaries: KillPointSummary[] = [];
 
   try {
     for (const killPoint of points) {
-      const counts: Record<number, number> = {};
-      const states: Record<string, number> = {};
-      const violations: Violation[] = [];
-      let killedAsExpected = 0;
+      for (const profile of profiles) {
+        const counts: Record<number, number> = {};
+        const states: Record<string, number> = {};
+        const retryCounts: Record<number, number> = {};
+        const retryStates: Record<string, number> = {};
+        const violations: Violation[] = [];
+        let killedAsExpected = 0;
+        let preempted = 0;
+        let escalated = 0;
 
-      for (let trial = 1; trial <= options.trials; trial += 1) {
-        const observation = await runTrial(killPoint, trial, join(root, killPoint));
-        const found = judge(observation);
+        for (let trial = 1; trial <= options.trials; trial += 1) {
+          const observed = await runTrial(
+            killPoint,
+            profile,
+            trial,
+            join(root, `${killPoint}-${profile.name}`),
+            withRetry,
+          );
 
-        counts[observation.railEntities.length] =
-          (counts[observation.railEntities.length] ?? 0) + 1;
-        const stateKey = observation.state ?? 'no intent row';
-        states[stateKey] = (states[stateKey] ?? 0) + 1;
-        if (observation.killed) killedAsExpected += 1;
-        violations.push(...found);
+          for (const observation of observed) {
+            const found = judge(observation);
+            violations.push(...found);
+            options.onTrial?.(observation, found);
 
-        options.onTrial?.(observation, found);
+            // The two phases answer different questions and are tallied apart.
+            const isRecover = observation.phase === 'recover';
+            const intoCounts = isRecover ? counts : retryCounts;
+            const intoStates = isRecover ? states : retryStates;
+            intoCounts[observation.railEntities.length] =
+              (intoCounts[observation.railEntities.length] ?? 0) + 1;
+            const stateKey = observation.state ?? 'no intent row';
+            intoStates[stateKey] = (intoStates[stateKey] ?? 0) + 1;
+            if (isRecover && observation.state === 'QUARANTINED') escalated += 1;
+          }
+          if (observed[0]?.killed === true) killedAsExpected += 1;
+          if (observed[0]?.killExpected === false) preempted += 1;
+        }
+
+        summaries.push({
+          killPoint,
+          profile: profile.name,
+          trials: options.trials,
+          counts,
+          states,
+          retryCounts,
+          retryStates,
+          killedAsExpected,
+          preempted,
+          escalated,
+          violations,
+        });
       }
-
-      summaries.push({
-        killPoint,
-        trials: options.trials,
-        counts,
-        states,
-        killedAsExpected,
-        violations,
-      });
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -238,18 +304,30 @@ export function resultsPath(): string {
 
 export async function main(argv: readonly string[]): Promise<number> {
   const trials = parseTrials(argv);
+  const full = argv.includes('--full');
+  const profiles = full ? FAULT_PROFILES : [FAULT_PROFILES[0]!];
+
   process.stdout.write(
-    `chaos matrix: ${String(KILL_POINTS.length)} kill points x ${String(trials)} trials\n`,
+    `chaos matrix: ${String(KILL_POINTS.length)} kill points x ` +
+      `${String(profiles.length)} fault profile(s) x ${String(trials)} trials` +
+      `${full ? ', plus a retry phase' : ''}\n`,
   );
 
   const results = await runMatrix({
     trials,
+    profiles,
+    withRetry: full,
     onTrial: (observation, violations) => {
       const mark = violations.length === 0 ? 'ok  ' : 'FAIL';
+      const via = observation.disposition === null ? '' : ` via ${observation.disposition}`;
       process.stdout.write(
-        `  ${mark} ${observation.killPoint} #${String(observation.trial)} ` +
-          `rail=${String(observation.railEntities.length)} state=${observation.state ?? 'none'}\n`,
+        `  ${mark} ${observation.killPoint}/${observation.profile}/${observation.phase} ` +
+          `#${String(observation.trial)} rail=${String(observation.railEntities.length)} ` +
+          `state=${observation.state ?? 'none'}${via}\n`,
       );
+      for (const violation of violations) {
+        process.stdout.write(`       ${violation.kind}: ${violation.message}\n`);
+      }
     },
   });
 
