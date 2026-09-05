@@ -125,7 +125,7 @@ export function health(ctx: ConsoleContext, ready: { ready: boolean; outstanding
 } {
   return {
     status: ready.ready ? 'ok' : 'recovering',
-    version: '0.1.1',
+    version: '0.2.0',
     recovery: { complete: ready.ready, stranded_resolved: ready.outstanding },
     rail: ctx.railKind,
     started_at: ctx.startedAt,

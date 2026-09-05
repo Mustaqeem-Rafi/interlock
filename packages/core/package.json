@@ -1,6 +1,6 @@
 {
   "name": "@interlock/core",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Canonical JSON, hashing, the semantic idempotency key, shared types and Zod schemas.",
   "type": "module",

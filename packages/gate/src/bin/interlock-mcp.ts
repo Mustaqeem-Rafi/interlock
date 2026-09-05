@@ -37,7 +37,7 @@ import { MOCK_MANIFEST } from '../proxy/manifest.js';
  * parse error rather than a refund.
  */
 
-const VERSION = '0.1.1';
+const VERSION = '0.2.0';
 
 const HELP = `interlock-mcp ${VERSION}
 

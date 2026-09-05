@@ -21,7 +21,7 @@ import { loadMandate } from './interlock-mcp.js';
  * mis-click survivable.
  */
 
-const VERSION = '0.1.1';
+const VERSION = '0.2.0';
 
 const HELP = `interlock-console ${VERSION}
 

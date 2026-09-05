@@ -1,6 +1,6 @@
 {
   "name": "@interlock/gate",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "MCP proxy, the gate ladder, the exactly-once engine and the rail adapters.",
   "type": "module",
