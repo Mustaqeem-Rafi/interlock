@@ -78,12 +78,24 @@ jobs:
           npm install --no-audit --no-fund "./$TARBALL"
           echo "TARBALL=$TARBALL" >> "$GITHUB_ENV"
 
-      - name: The binaries are on PATH and run
+      # Asserts the OUTPUT, not the exit code. A binary whose entry guard fails
+      # to recognise it was invoked loads its modules, runs nothing, and exits
+      # 0 — which `bash -e` reads as success. That is exactly how a package
+      # that does nothing at all ships. npm links these as symlinks, so this
+      # runs them the way a consumer does and demands they speak.
+      - name: The binaries are on PATH and actually run
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/consumer"
-          ./node_modules/.bin/interlock-mcp --version
-          ./node_modules/.bin/interlock-init --version
+          for bin in interlock-mcp interlock-init; do
+            printed="$(./node_modules/.bin/$bin --version)"
+            if [ "$printed" != "0.1.0" ]; then
+              echo "$bin --version printed '$printed', expected '0.1.0'" >&2
+              echo "A silent exit 0 means the entry guard did not fire." >&2
+              exit 1
+            fi
+            echo "$bin -> $printed"
+          done
 
       # The README's first instruction, executed. A refund applies, the same
       # call made twice moves money once, and a refund past the mandate is

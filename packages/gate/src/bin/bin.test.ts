@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -165,4 +165,38 @@ maybe('interlock-mcp: a stock client over stdio', () => {
     expect(id).toBeDefined();
     expect(secondText).toContain(id ?? 'no-id');
   }, 20_000);
+});
+
+describe('interlock-mcp: invoked the way npm installs it', () => {
+  // npm links bins as symlinks, so argv[1] is the link and import.meta.url is
+  // the realpath. Comparing them without resolving made main() never run: the
+  // process exited 0 in silence, which every shell reads as success. Windows
+  // refuses symlinks without elevation, hence the guard rather than a skip
+  // that would hide the same failure on Linux.
+  const link = join(tmpdir(), `interlock-link-${String(process.pid)}`);
+  let linkable = false;
+  try {
+    symlinkSync(BIN, link);
+    linkable = true;
+  } catch {
+    linkable = false;
+  }
+
+  it.runIf(linkable)('prints its version through a symlink, rather than exiting silently', () => {
+    const printed = execFileSync(process.execPath, [link, '--version'], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    }).trim();
+    expect(printed).toBe('0.1.0');
+    rmSync(link, { force: true });
+  });
+
+  it('runs when argv[0] needs normalising, which is the same comparison', () => {
+    const indirect = join(dirname(BIN), '..', 'bin', 'interlock-mcp.js');
+    const printed = execFileSync(process.execPath, [indirect, '--version'], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    }).trim();
+    expect(printed).toBe('0.1.0');
+  });
 });

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -280,8 +280,30 @@ export async function main(argv: readonly string[]): Promise<number> {
 
 // Only when actually invoked as a program. Matching on the filename alone would
 // also fire when a test or a script merely imports this module.
-const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+/**
+ * Was this file run as a program, rather than imported?
+ *
+ * Comparing import.meta.url to argv[1] directly is wrong the moment the
+ * package is installed, because npm links bins as symlinks: argv[1] is
+ * node_modules/.bin/interlock-mcp while import.meta.url is the realpath under
+ * node_modules/interlock-mcp/dist. They never match, main() never runs, and
+ * the process exits 0 having done nothing at all — a silent success that
+ * looks identical to a working install until someone waits for a response
+ * that is never coming. Resolve the link before comparing.
+ */
+function invokedAsProgram(moduleUrl: string): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined) return false;
+  try {
+    return moduleUrl === pathToFileURL(realpathSync(entry)).href;
+  } catch {
+    // argv[1] can name something unstattable (a bundler shim, a deleted file).
+    // Falling back to the raw path keeps `node ./dist/x.js` working.
+    return moduleUrl === pathToFileURL(entry).href;
+  }
+}
+
+const invokedDirectly = invokedAsProgram(import.meta.url);
 
 if (invokedDirectly) {
   main(process.argv.slice(2))
