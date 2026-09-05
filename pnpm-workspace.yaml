@@ -1,0 +1,8 @@
+packages:
+  - 'packages/*'
+
+# pnpm 10 blocks dependency lifecycle scripts unless allow-listed.
+# esbuild (via vitest) and better-sqlite3 both need theirs to run.
+onlyBuiltDependencies:
+  - esbuild
+  - better-sqlite3

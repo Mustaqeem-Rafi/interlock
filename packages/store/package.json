@@ -1,0 +1,25 @@
+{
+  "name": "@interlock/store",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SQLite-backed intent and audit ledger (better-sqlite3, synchronous by design).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --build --noEmit"
+  },
+  "dependencies": {
+    "@interlock/core": "workspace:*"
+  }
+}

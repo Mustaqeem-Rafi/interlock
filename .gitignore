@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local secrets and local state — never committed.
+.env
+.env.local
+*.db
+*.db-wal
+*.db-shm
+data/
+
+.DS_Store
