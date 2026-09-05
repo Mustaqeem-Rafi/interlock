@@ -18,7 +18,12 @@ export type InterlockErrorCode =
   | 'STORE_DUPLICATE_INTENT'
   | 'STORE_NOT_FOUND'
   | 'STORE_STALE_STATE'
-  | 'STORE_CONSTRAINT';
+  | 'STORE_CONSTRAINT'
+  | 'RAIL_TIMEOUT'
+  | 'RAIL_UNAVAILABLE'
+  | 'RAIL_DUPLICATE_RECEIPT'
+  | 'RAIL_NOT_FOUND'
+  | 'RAIL_REJECTED';
 
 export abstract class InterlockError extends Error {
   abstract readonly code: InterlockErrorCode;

@@ -65,6 +65,9 @@ importers:
       '@interlock/store':
         specifier: workspace:*
         version: link:../store
+      zod:
+        specifier: ^4.1.5
+        version: 4.5.4
 
   packages/store:
     dependencies:

@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@interlock/core": "workspace:*",
-    "@interlock/store": "workspace:*"
+    "@interlock/store": "workspace:*",
+    "zod": "^4.1.5"
   }
 }
