@@ -26,7 +26,11 @@ export type InterlockErrorCode =
   | 'RAIL_REJECTED'
   | 'RAIL_RESPONSE_MISMATCH'
   | 'CHAOS_CONFIG'
-  | 'CHAOS_TRIAL_FAILED';
+  | 'CHAOS_TRIAL_FAILED'
+  | 'BENCH_CATALOGUE_INVALID'
+  | 'BENCH_CACHE_MISS'
+  | 'BENCH_NO_LIVE_MODEL'
+  | 'MANDATE_INIT_FAILED';
 
 export abstract class InterlockError extends Error {
   abstract readonly code: InterlockErrorCode;

@@ -12,3 +12,6 @@ coverage/
 data/
 
 .DS_Store
+
+# local-only vitest shim config (node:sqlite stand-in)
+vitest.local.config.ts

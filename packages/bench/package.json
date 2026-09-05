@@ -17,11 +17,22 @@
   ],
   "scripts": {
     "build": "tsc --build",
-    "typecheck": "tsc --build"
+    "typecheck": "tsc --build",
+    "bench": "node ../../packages/bench/dist/cli.js"
   },
   "dependencies": {
     "@interlock/core": "workspace:*",
     "@interlock/gate": "workspace:*",
-    "@interlock/store": "workspace:*"
+    "@interlock/store": "workspace:*",
+    "@langchain/core": "^1.2.9",
+    "@langchain/langgraph": "^1.4.14",
+    "@langchain/mcp-adapters": "^1.1.4",
+    "@langchain/openai": "^1.5.11",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "better-sqlite3": "^12.11.1",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13"
   }
 }

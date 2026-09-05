@@ -94,6 +94,16 @@ export type ToolManifestPin = z.infer<typeof ToolManifestPin>;
 export const Provenance = z.strictObject({
   server_id: z.string().min(1),
   pinned_manifests: z.record(ToolName, ToolManifestPin),
+  /** sha256 over the whole manifest as served when the mandate was authored. */
+  manifest_sha256: Sha256Hex.optional(),
+  /**
+   * The tool list exactly as it was pinned.
+   *
+   * Gate 6 needs more than a hash. Detecting drift is only half the job: the
+   * other half is that the agent must never see the changed description, which
+   * means we have to be able to serve the version a human approved.
+   */
+  pinned_manifest: z.array(z.unknown()).optional(),
 });
 export type Provenance = z.infer<typeof Provenance>;
 
