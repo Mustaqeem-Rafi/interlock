@@ -10,8 +10,18 @@ concurrency:
 
 jobs:
   check:
-    name: lint, typecheck, test
+    name: lint, typecheck, test (node ${{ matrix.node }})
     runs-on: ubuntu-latest
+
+    # package.json says the engine is ^22.13.0 || ^24.0.0. Both are run here,
+    # because an engines range nobody tests is a guess about other people's
+    # machines. Odd-numbered Node is excluded on purpose: better-sqlite3 ships
+    # prebuilds for the LTS lines only, so 23 falls back to compiling from
+    # source and a clean install needs a full toolchain.
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
 
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +30,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: pnpm
 
       - name: Install

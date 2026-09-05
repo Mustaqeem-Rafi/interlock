@@ -747,7 +747,7 @@ Which parts are verified fact and which we built for the benchmark, kept separat
 
 | Problem | Root Cause | Resolution |
 | :--- | :--- | :--- |
-| `Could not locate the bindings file (better_sqlite3.node)` | `better-sqlite3` native C++ addon was compiled against a different Node ABI version. | Run `pnpm rebuild better-sqlite3` or run on Node 22 (the targeted LTS version). |
+| `Could not locate the bindings file (better_sqlite3.node)`, or node-gyp errors during `pnpm install` | You are on an odd-numbered Node release. `better-sqlite3` ships prebuilt binaries for the even-numbered LTS lines only, so on Node 23 or 25 the install falls back to compiling from source and needs a full toolchain. | Use **Node 22 or 24**, the two this is tested on. `engines` names both. |
 | `Tool not granted: create_refund` | The tool is not listed in `scope.grants` within the active mandate YAML. | Update the mandate YAML to include the tool or generate a new mandate with `interlock init`. |
 | `amount must be an integer in minor units, got float` | Action payload provided currency in decimal units (e.g. `18.99`) instead of integer paise (`1899`). | Ensure agent arguments use integer minor units. Interlock enforces integers at all API boundaries. |
 | `Proxy exits immediately on startup` | Mandate expired or invalid format. | Check the `expires_at` timestamp in your mandate YAML against current epoch milliseconds. |
