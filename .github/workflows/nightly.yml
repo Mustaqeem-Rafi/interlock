@@ -1,0 +1,103 @@
+name: nightly-live
+
+# Live runs against Razorpay test mode. Deliberately NOT on every push.
+#
+# The reason is the whole thesis of this project. An agent that calls a payment
+# API on every event, because the event happened and the call was available, is
+# the failure mode Interlock exists to prevent. It would be strange to build
+# that defence and then wire our own CI to hit a payment API a hundred times a
+# day because a README changed.
+#
+# So: the mock rail runs on every push, and it is the rail that gates every
+# merge. Test mode runs once a night, on a schedule, against a real endpoint,
+# to answer the one question the mock cannot — whether our model of Razorpay's
+# behaviour is still true. That is a different question from "is the code
+# correct", it needs a real network, and it is worth exactly one run a day.
+#
+# It is also why this workflow can be dispatched by hand: when you actually
+# want to check the real API, you say so.
+
+on:
+  schedule:
+    # 02:30 UTC, which is 08:00 IST — after the working day, before the next.
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+    inputs:
+      scenarios:
+        description: 'Scenario selector, e.g. "A" or "A-12,B-14". Blank runs all.'
+        required: false
+        default: ''
+
+concurrency:
+  group: nightly-live
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: razorpay test mode
+    runs-on: ubuntu-latest
+    # Without credentials there is nothing to talk to, and a green run that
+    # silently used the mock would be worse than no run at all.
+    if: github.repository_owner != ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Refuse to run without test-mode credentials
+        env:
+          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_TEST_KEY_ID }}
+        run: |
+          if [ -z "$RAZORPAY_KEY_ID" ]; then
+            echo "No RAZORPAY_TEST_KEY_ID secret is configured."
+            echo "Skipping rather than silently falling back to the mock rail:"
+            echo "a live job that quietly ran against a mock would report a fact"
+            echo "about our own code while claiming to report one about Razorpay."
+            exit 78
+          fi
+          case "$RAZORPAY_KEY_ID" in
+            rzp_test_*) echo "test-mode key confirmed" ;;
+            *) echo "REFUSING: key is not a test-mode key (rzp_test_ prefix)"; exit 1 ;;
+          esac
+
+      - name: Benchmark against test mode
+        env:
+          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_TEST_KEY_ID }}
+          RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_TEST_KEY_SECRET }}
+          INTERLOCK_CONSOLE_TOKEN: ${{ secrets.INTERLOCK_CONSOLE_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          node packages/bench/dist/cli.js \
+            --rail razorpay \
+            --harness both \
+            --record \
+            --scenarios "${{ github.event.inputs.scenarios }}" \
+            --out RESULTS.live.md
+
+      - name: Upload live results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-results
+          path: RESULTS.live.md
+
+      # Any model responses newly recorded against the live run are worth
+      # keeping: they are what makes the next push-time run free and identical.
+      - name: Upload newly recorded model cache
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-cache
+          path: packages/bench/.cache

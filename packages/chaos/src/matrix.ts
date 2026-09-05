@@ -297,9 +297,9 @@ export function parseTrials(argv: readonly string[]): number {
   return parsed;
 }
 
-/** RESULTS.md at the repository root: packages/chaos/dist -> ../../.. */
+/** RESULTS.chaos.md at the repo root. Composed into RESULTS.md by scripts/compose-results.mjs. */
 export function resultsPath(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'RESULTS.md');
+  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'RESULTS.chaos.md');
 }
 
 export async function main(argv: readonly string[]): Promise<number> {
