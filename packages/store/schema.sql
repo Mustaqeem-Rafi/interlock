@@ -39,9 +39,12 @@ CREATE TABLE IF NOT EXISTS intents (
 
   PRIMARY KEY (merchant_id, sik),
 
+  -- Must stay in step with IntentState in @interlock/core and with the
+  -- transition switch in gate/exactly-once/machine.ts.
   CHECK (state IN (
-    'PROPOSED', 'AUTHORIZED', 'IN_FLIGHT', 'APPLIED', 'CONFIRMED_NOT_APPLIED',
-    'STILL_UNKNOWN', 'HELD', 'BLOCKED', 'QUARANTINED'
+    'PROPOSED', 'HELD', 'BLOCKED', 'AUTHORIZED', 'IN_FLIGHT', 'APPLIED',
+    'FAILED_TERMINAL', 'UNKNOWN', 'RECONCILING', 'CONFIRMED_NOT_APPLIED',
+    'QUARANTINED'
   )),
   CHECK (reversibility IN ('reversible', 'compensable', 'irreversible')),
   CHECK (amount_minor > 0),
