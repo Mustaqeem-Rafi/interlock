@@ -12,6 +12,7 @@ import { createReconciler } from '../exactly-once/reconciler.js';
 import { createRecovery } from '../exactly-once/recovery.js';
 import { createWal } from '../exactly-once/wal.js';
 import { createMockRail, type MockRail } from '../rail/mock.js';
+import { createRazorpayRail } from '../rail/razorpay.js';
 import type { Rail } from '../rail/rail.js';
 import { createEngine } from '../proxy/engine.js';
 import { createProxyServer } from '../proxy/server.js';
@@ -50,6 +51,7 @@ OPTIONS
   --mandate <path>       Mandate YAML a human approved. Required.
                          Generate one with: interlock init --upstream <url>
   --rail <name>          mock (default) | razorpay
+  --allow-live           Required before a non-rzp_test_ key is accepted.
   --db <path>            SQLite ledger. Defaults to INTERLOCK_DB_PATH, and
                          failing that to a file beside the mandate.
   --upstream-command <c> Spawn a real upstream MCP server, e.g.
@@ -78,6 +80,7 @@ interface Args {
   readonly upstreamCommand: string | undefined;
   readonly agent: string | undefined;
   readonly purposeCheck: boolean;
+  readonly allowLive: boolean;
 }
 
 function parseArgs(argv: readonly string[]): Args {
@@ -92,6 +95,7 @@ function parseArgs(argv: readonly string[]): Args {
     upstreamCommand: flag('upstream-command'),
     agent: flag('agent'),
     purposeCheck: argv.includes('--purpose-check'),
+    allowLive: argv.includes('--allow-live'),
   };
 }
 
@@ -136,6 +140,41 @@ function ledgerBesideMandate(mandatePath: string): string {
   return join(dirname(full), `${basename(full).replace(/\.[^.]+$/, '')}.ledger.db`);
 }
 
+/**
+ * Which rail, and refuse clearly rather than half-starting.
+ *
+ * Live credentials are read here and nowhere else. The key prefix is
+ * checked because rzp_live_ keys work identically to test keys right up
+ * until the money is real, and nothing later in the process would notice
+ * the difference. Pointing this at production is a decision someone makes
+ * deliberately, with --allow-live, not one they discover afterwards.
+ */
+function buildRail(args: Args): Rail {
+  if (args.rail !== 'razorpay') {
+    const mock = createMockRail({});
+    seedMock(mock);
+    return mock;
+  }
+
+  const keyId = process.env['RAZORPAY_KEY_ID'] ?? '';
+  const keySecret = process.env['RAZORPAY_KEY_SECRET'] ?? '';
+  if (keyId === '' || keySecret === '') {
+    throw new InvariantViolation(
+      'bin.rail',
+      '--rail razorpay needs RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET',
+    );
+  }
+  if (!keyId.startsWith('rzp_test_') && !args.allowLive) {
+    throw new InvariantViolation(
+      'bin.rail',
+      `RAZORPAY_KEY_ID does not look like a test key. Pass --allow-live if you ` +
+        `really mean to move real money.`,
+    );
+  }
+  note(`rail razorpay · ${keyId.startsWith('rzp_test_') ? 'test mode' : 'LIVE MODE'}`);
+  return createRazorpayRail({ keyId, keySecret });
+}
+
 /** A demo payment and order, so a fresh clone has something to refund. */
 function seedMock(rail: MockRail): void {
   const order = rail.seedOrder({ amount_minor: 189_900 });
@@ -147,8 +186,8 @@ async function buildUpstream(
   rail: MockRail | Rail,
 ): Promise<{ upstream: Upstream; close: () => Promise<void> }> {
   if (args.upstreamCommand === undefined) {
-    // Self-contained: the mock rail answers reads directly.
-    const mock = rail as MockRail;
+    // The rail itself answers reads. Both implementations satisfy Rail, so
+    // nothing here needs to know which one it is holding.
     return {
       upstream: createUpstream({
         listTools: () => Promise.resolve({ tools: [...MOCK_MANIFEST] as never }),
@@ -156,11 +195,11 @@ async function buildUpstream(
           const a = request.arguments ?? {};
           const paymentId = typeof a['payment_id'] === 'string' ? a['payment_id'] : '';
           if (request.name === 'fetch_payment') {
-            return { ...(await mock.fetchPayment(paymentId)) } as Record<string, unknown>;
+            return { ...(await rail.fetchPayment(paymentId)) } as Record<string, unknown>;
           }
           if (request.name === 'fetch_order') {
             const id = typeof a['order_id'] === 'string' ? a['order_id'] : '';
-            return { ...(await mock.fetchOrder(id)) } as Record<string, unknown>;
+            return { ...(await rail.fetchOrder(id)) } as Record<string, unknown>;
           }
           return { error: `unsupported read tool ${request.name}` };
         },
@@ -207,11 +246,8 @@ export async function main(argv: readonly string[]): Promise<number> {
     process.stderr.write('--mandate <path> is required. See --help.\n');
     return 2;
   }
-  if (args.rail !== 'mock') {
-    process.stderr.write(
-      `--rail ${args.rail} is not available in v0.1; only the mock rail ships. ` +
-        `The envelope is stated in the README rather than implied.\n`,
-    );
+  if (args.rail !== 'mock' && args.rail !== 'razorpay') {
+    process.stderr.write(`--rail ${args.rail} is not a rail this build knows.\n`);
     return 2;
   }
   if (args.purposeCheck) {
@@ -221,9 +257,11 @@ export async function main(argv: readonly string[]): Promise<number> {
   const mandate = loadMandate(args.mandate);
   const dbPath = args.db ?? process.env['INTERLOCK_DB_PATH'] ?? ledgerBesideMandate(args.mandate);
 
+  // The rail is built before anything is opened. Credentials are configuration,
+  // and configuration that is going to be refused should be refused before a
+  // ledger file is created and a recovery pass is run against it.
+  const rail = buildRail(args);
   const store: Store = openStore(dbPath);
-  const rail = createMockRail({});
-  seedMock(rail);
 
   const reconciler = createReconciler({ store, rail });
 

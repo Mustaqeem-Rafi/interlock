@@ -8,7 +8,11 @@ const nodeGlobals = {
 };
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**'] },
+  { ignores: [
+      // Browser assets, not source. gl.js is the landing page's WebGL module
+      // and is linted by nothing here on purpose: it targets a DOM this config
+      // does not describe.
+      'docs/**','**/dist/**', '**/node_modules/**', '**/coverage/**'] },
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
