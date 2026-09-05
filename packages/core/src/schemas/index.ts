@@ -27,6 +27,7 @@ export {
   ValueConstraint,
   VelocityWindow,
   mandateHash,
+  onUnresolvable,
 } from './mandate.js';
 
 export {

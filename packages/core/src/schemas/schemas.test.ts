@@ -13,6 +13,7 @@ const VALID_MANDATE = {
   v: 1,
   mandate_id: 'mnd_2025_09_05_support',
   merchant_id: 'acc_KtqXyZ01',
+  agent_id: 'agent_support_bot',
   issued_at: 1_757_000_000_000,
   expires_at: 1_757_086_400_000,
   purpose: 'Refund duplicate charges raised by order support, up to 5000 INR per refund.',
@@ -206,6 +207,7 @@ describe('ProposedAction', () => {
   const ACTION = {
     request_id: 'req_01',
     merchant_id: 'acc_KtqXyZ01',
+    agent_id: 'agent_support_bot',
     tool: 'create_refund',
     subject: 'pay_MkT9xQr2LbVc41',
     amount_minor: 250_000,

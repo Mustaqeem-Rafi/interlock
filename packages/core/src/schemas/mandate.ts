@@ -36,6 +36,14 @@ export type ValueConstraint = z.infer<typeof ValueConstraint>;
 export const ToolGrant = z.strictObject({
   reversibility: ReversibilityClass,
   value: ValueConstraint,
+  /**
+   * What to do when Gate 2 cannot resolve a constraint referent off the rail.
+   *
+   * Omitted means BLOCK for compensable and irreversible tools and HOLD for
+   * reversible ones. The union has no ALLOW: not being able to check a limit is
+   * never grounds for waiving it.
+   */
+  on_unresolvable: z.enum(['HOLD', 'BLOCK']).optional(),
 });
 export type ToolGrant = z.infer<typeof ToolGrant>;
 
@@ -115,6 +123,8 @@ export const Mandate = z
     v: z.literal(1),
     mandate_id: z.string().min(1),
     merchant_id: MerchantId,
+    /** The one agent identity this mandate authorises. Gate 1 checks it. */
+    agent_id: z.string().min(1),
     issued_at: EpochMs,
     expires_at: EpochMs,
     /** Human-readable statement of what the agent is authorised to do. */
@@ -160,6 +170,15 @@ export const Mandate = z
     }
   });
 export type Mandate = z.infer<typeof Mandate>;
+
+/**
+ * The effective unresolvable policy for a grant. Kept next to the schema so the
+ * default is stated once, where the field is defined.
+ */
+export function onUnresolvable(grant: ToolGrant): 'HOLD' | 'BLOCK' {
+  if (grant.on_unresolvable !== undefined) return grant.on_unresolvable;
+  return grant.reversibility === 'reversible' ? 'HOLD' : 'BLOCK';
+}
 
 /**
  * The pin a decision records.

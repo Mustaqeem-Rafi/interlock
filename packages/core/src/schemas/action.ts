@@ -18,6 +18,8 @@ import {
 export const ProposedAction = z.strictObject({
   request_id: z.string().min(1),
   merchant_id: MerchantId,
+  /** Who is asking. Compared against the mandate by Gate 1. */
+  agent_id: z.string().min(1),
   tool: ToolName,
   /** Rail entity id, resolved by us. */
   subject: z.string().min(1),
