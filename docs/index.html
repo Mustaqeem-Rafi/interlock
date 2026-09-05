@@ -1,0 +1,1999 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Interlock — what you put between an AI agent and a payment API</title>
+<meta name="description" content="Interlock is what you put between an AI agent and a payment API so the agent cannot pay twice, and cannot pay more than you authorised. The model reads and writes English; deterministic code touches the money.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js" crossorigin="anonymous">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.core.min.js" crossorigin="anonymous">
+<script>
+/* Decide the rendering mode before first paint so the layout never jumps.
+   No class      → the page as designed in 2D (SVG trace, timed replay).
+   html.gl       → WebGL x-ray slots are shown, the 2D trace becomes the textual fallback.
+   html.motion   → scroll choreography (pinned tracks). Absent under prefers-reduced-motion.
+   The module removes both classes if Three.js fails to load, so an offline open degrades to 2D. */
+(function(){
+  try{
+    var d=document.documentElement;
+    var reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var tiny=innerWidth<360||(navigator.deviceMemory&&navigator.deviceMemory<=2);
+    var c=document.createElement('canvas'), o={failIfMajorPerformanceCaveat:true};
+    var gl=c.getContext('webgl2',o)||c.getContext('webgl',o);
+    if(gl&&!tiny){
+      d.classList.add('gl'); if(!reduced) d.classList.add('motion');
+      var lose=gl.getExtension('WEBGL_lose_context'); if(lose) lose.loseContext();
+    }
+  }catch(e){}
+})();
+</script>
+<style>
+/* ═══════════════════ design system ═══════════════════ */
+:root{
+  --bg:#0c0e11; --surface:#14171c; --raised:#1b1f26; --border:#262b33; --hair:#1e232a;
+  --text:#e6e9ee; --muted:#8b94a3; --dim:#5d6675;
+  --allow:#3fb950; --hold:#d29922; --block:#f85149; --link:#58a6ff;
+  --allow-bd:rgba(63,185,80,.34); --hold-bd:rgba(210,153,34,.38); --block-bd:rgba(248,81,73,.36);
+  --hold-bg:rgba(210,153,34,.08); --block-bg:rgba(248,81,73,.08);
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --r-ctl:6px; --r-card:8px; --r-panel:10px;
+  --max:1280px; --gut:32px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3,h4,p,ul,ol,figure,dl,dd{margin:0}
+ul,ol{padding:0;list-style:none}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit}
+:focus{outline:none}
+:focus-visible{outline:1px solid var(--link);outline-offset:3px;border-radius:3px}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.wrap{width:100%;max-width:var(--max);margin:0 auto;padding:0 var(--gut)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.eyebrow.on{color:var(--muted)}
+.v-allow{color:var(--allow)}.v-hold{color:var(--hold)}.v-block{color:var(--block)}
+.code{display:inline-flex;align-items:center;height:22px;padding:0 8px;border:1px solid var(--border);border-radius:4px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);white-space:nowrap}
+.code.block{color:var(--block);border-color:var(--block-bd)}
+.code.hold{color:var(--hold);border-color:var(--hold-bd)}
+.code.allow{color:var(--allow);border-color:var(--allow-bd)}
+
+/* ═══════════════════ header ═══════════════════ */
+.top{position:sticky;top:0;z-index:20;background:rgba(12,14,17,.92);border-bottom:1px solid transparent;transition:border-color .2s ease}
+.top.scrolled{border-bottom-color:var(--hair)}
+.top-in{height:58px;display:flex;align-items:center;gap:28px}
+.mark{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-.018em;font-size:16px}
+.mark svg{width:14px;height:14px;color:var(--muted)}
+.nav{display:flex;gap:26px;margin-left:8px}
+.nav a{font-size:14px;color:var(--muted)}
+.nav a:hover{color:var(--text)}
+.top .cta{margin-left:auto}
+.btn{display:inline-flex;align-items:center;gap:9px;height:38px;padding:0 16px;border-radius:var(--r-ctl);border:1px solid var(--border);font-size:14px;cursor:pointer;background:none;color:var(--text);white-space:nowrap;transition:background .14s ease,border-color .14s ease}
+.btn:hover{background:var(--raised)}
+.btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+.btn.primary:hover{background:#fff;border-color:#fff}
+.btn.ghost{border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--text);background:var(--raised)}
+.btn .arr{font-family:var(--mono);font-size:13px}
+.cmd{display:inline-flex;align-items:center;gap:12px;height:46px;padding:0 8px 0 16px;border:1px solid var(--border);border-radius:var(--r-ctl);font-family:var(--mono);font-size:14px}
+.cmd .p{color:var(--dim)}
+.cmd .cur{display:inline-block;width:7px;height:15px;background:var(--muted);vertical-align:-2px;margin-left:2px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.cmd button{height:30px;padding:0 10px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.cmd button:hover{color:var(--text);background:var(--raised)}
+.cmd button[data-done="1"]{color:var(--allow);border-color:var(--allow-bd)}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+
+/* ═══════════════════ hero — the opening frame ═══════════════════ */
+.hero{padding:72px 0 0}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:64px;align-items:end}
+.hero h1{font-size:clamp(32px,3.6vw,47px);line-height:1.08;letter-spacing:-.035em;font-weight:600;max-width:23ch;margin-top:20px}
+.hero h1 em{font-style:normal;color:var(--muted);font-weight:500}
+.hero .lede{margin-top:22px;font-size:17px;color:var(--muted);max-width:40ch}
+.hero .lede b{color:var(--text);font-weight:500}
+.hero .actions{margin-top:30px}
+/* the readout */
+.readout{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border-top:1px solid var(--hair)}
+.ro{padding:18px 20px 0 0}
+.ro+.ro{padding-left:20px;border-left:1px solid var(--hair)}
+.ro .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);line-height:1.6}
+.ro .v{font-family:var(--mono);font-size:clamp(28px,3vw,40px);letter-spacing:-.045em;line-height:1;margin-top:12px}
+.ro .s{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:10px;letter-spacing:.04em}
+.readout .ro:nth-child(3) .v{color:var(--block)}
+/* the trace */
+.trace-wrap{margin-top:64px;padding:26px 0 0;border-top:1px solid var(--hair)}
+.trace-cap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.trace-svg{width:100%;height:auto;display:block;margin-top:6px}
+.trace-svg text{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;fill:var(--dim)}
+.trace-svg text.on{fill:var(--muted)}
+.trace-svg text.hi{fill:var(--text)}
+.trace-svg text.bad{fill:var(--block)}
+.trace-svg text.ok{fill:var(--allow)}
+.trace-svg .rail{stroke:var(--border);stroke-width:1.5;fill:none}
+.trace-svg .rail.after{stroke-dasharray:3 5}
+.trace-svg .node{fill:var(--bg);stroke:var(--muted);stroke-width:1.5}
+.trace-svg .node.fill{fill:var(--muted)}
+.trace-svg .node.never{stroke:var(--dim);stroke-dasharray:2 2}
+.trace-svg .bound{stroke:var(--hold);stroke-width:1.25;stroke-dasharray:2 5}
+.trace-svg .g{fill:var(--bg);stroke:var(--dim);stroke-width:1}
+.trace-svg .g.pass{stroke:var(--allow);fill:var(--allow)}
+.trace-svg .g.stop{stroke:var(--block);fill:var(--block)}
+.trace-svg .g.model{stroke:var(--hold);stroke-dasharray:2 2}
+.trace-svg .g.dimmed{opacity:.35}
+.trace-svg .sig{fill:var(--text)}
+.trace-svg .sig.stop{fill:var(--block)}
+.trace-svg .draw{stroke-dasharray:1300;stroke-dashoffset:1300;animation:draw 1.4s cubic-bezier(.2,.7,.3,1) .1s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.trace-svg .fade{opacity:0;animation:fadein .5s ease forwards}
+@keyframes fadein{to{opacity:1}}
+.trace-svg .beat{animation:beat 2.8s ease-in-out infinite}
+@keyframes beat{0%,100%{opacity:1}50%{opacity:.35}}
+.trace-mobile{display:none}
+
+/* ═══════════════════ chapters ═══════════════════ */
+.chapter{padding:150px 0 0}
+.ch-num{display:flex;align-items:center;gap:14px}
+.ch-num::after{content:"";flex:1;max-width:120px;height:1px;background:var(--border)}
+.h2{font-size:clamp(30px,3.6vw,48px);line-height:1.08;letter-spacing:-.035em;font-weight:600;margin-top:18px}
+.h2 em{font-style:normal;color:var(--muted);font-weight:500}
+.lead{margin-top:20px;font-size:17px;color:var(--muted);max-width:52ch}
+.lead b{color:var(--text);font-weight:500}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:72px;align-items:start}
+.two.wide-r{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}
+.two.wide-l{grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr)}
+
+/* vertical system trace — the recurring motif */
+.trace{position:relative;padding-left:34px}
+.trace::before{content:"";position:absolute;left:5px;top:10px;bottom:14px;width:1px;background:var(--border)}
+.tr{position:relative;padding:0 0 34px}
+.tr::before{content:"";position:absolute;left:-34px;top:8px;width:11px;height:11px;border-radius:50%;background:var(--bg);border:1px solid var(--muted)}
+.tr.done::before{background:var(--muted)}
+.tr.stop::before{background:var(--block);border-color:var(--block);border-radius:1px}
+.tr.never::before{border-style:dashed;border-color:var(--dim)}
+.tr.cut{padding:0 0 30px}
+.tr .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.tr .v{font-family:var(--mono);font-size:clamp(26px,2.6vw,36px);letter-spacing:-.045em;line-height:1.05;margin-top:8px}
+.tr .v.small{font-size:16px;letter-spacing:0}
+.tr .s{font-size:15px;color:var(--muted);margin-top:8px;max-width:38ch;line-height:1.5}
+.tr .m{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:8px;letter-spacing:.02em}
+/* the boundary cut inside a trace */
+.cutline{position:relative;margin:-6px 0 30px -34px;display:flex;align-items:center;gap:14px}
+.cutline::before,.cutline::after{content:"";height:0;border-top:1px dashed var(--hold);flex:1;opacity:.8}
+.cutline::before{max-width:26px}
+.cutline b{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--hold);font-weight:400;white-space:nowrap}
+/* evidence — flat, machine-aligned, no box */
+.ev{font-family:var(--mono);font-size:12.5px;margin-top:22px;max-width:520px}
+.ev .r{display:grid;grid-template-columns:minmax(150px,220px) minmax(0,1fr);gap:16px;padding:8px 0;border-bottom:1px solid var(--hair)}
+.ev .r:first-child{border-top:1px solid var(--hair)}
+.ev .r span:first-child{color:var(--dim)}
+.ev .r .f{color:var(--muted);margin-left:10px}
+.ev .r .f::before{content:"→ ";color:var(--dim)}
+.ev .r .n{color:var(--dim)}
+.ev .r.hi span:last-child{color:var(--text)}
+.ev-cap{margin-top:12px}
+
+/* it looked valid */
+.valid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:72px;margin-top:104px;padding-top:56px;border-top:1px solid var(--hair);max-width:940px}
+.valid ul li{font-family:var(--mono);font-size:15px;padding:9px 0;letter-spacing:.01em}
+.valid .ok li{color:var(--muted)}
+.valid .ok li::before{content:"✓ ";color:var(--dim)}
+.valid .no li{color:var(--text)}
+.valid .no li::before{content:"✕ ";color:var(--block)}
+.valid h3{font-size:clamp(24px,2.6vw,34px);letter-spacing:-.03em;line-height:1.1;font-weight:600}
+.valid h3 em{font-style:normal;color:var(--muted);font-weight:500}
+.valid .no h3{color:var(--text)}
+.valid .no h3 em{color:var(--block)}
+
+/* the boundary — the philosophical centre */
+.boundary{padding:170px 0 150px}
+.bound-stmt{text-align:center;font-size:clamp(30px,4.4vw,58px);line-height:1.08;letter-spacing:-.04em;font-weight:600;max-width:22ch;margin:0 auto}
+.bound-stmt em{font-style:normal;color:var(--muted);font-weight:500;display:block}
+.bound{max-width:520px;margin:72px auto 0;position:relative;text-align:center}
+.bound .pole{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--text)}
+.bound .stem{width:1px;height:26px;background:var(--border);margin:14px auto}
+.bound .stem.long{height:34px}
+.bound .items{font-family:var(--mono);font-size:13px;letter-spacing:.06em;color:var(--muted);line-height:2.1}
+.bound .items.d{color:var(--text)}
+.bound .cut{margin:22px 0;padding:14px 0;border-top:1px dashed var(--hold);border-bottom:1px dashed var(--hold);font-family:var(--mono);font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--hold)}
+.bound .cut small{display:block;font-size:11px;letter-spacing:.14em;color:var(--dim);margin-top:6px;text-transform:none}
+.bound-foot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:56px;max-width:860px;margin:72px auto 0}
+.bound-foot p{font-size:15.5px;color:var(--muted);line-height:1.6}
+.bound-foot p b{color:var(--text);font-weight:500}
+
+/* the machine — six gates */
+.machine{margin-top:64px;position:relative}
+.machine::before{content:"";position:absolute;left:5px;top:12px;bottom:12px;width:1px;background:var(--border)}
+.gate{position:relative;display:grid;grid-template-columns:34px 64px 170px minmax(0,1fr) 300px;gap:24px;align-items:start;padding:30px 0;
+  opacity:0;transform:translateY(6px);transition:opacity .5s ease,transform .5s ease}
+.gate.in{opacity:1;transform:none}
+.gate::before{content:"";position:absolute;left:0;top:35px;width:11px;height:11px;border-radius:50%;background:var(--bg);border:1px solid var(--muted)}
+.gate.det::before{background:var(--muted)}
+.gate .n{grid-column:2;font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--dim);padding-top:4px}
+.gate h3{grid-column:3;font-size:21px;font-weight:600;letter-spacing:-.02em}
+.gate h3 small{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-top:8px;font-weight:400}
+.gate .q{grid-column:4;font-size:17px;line-height:1.45;max-width:38ch}
+.gate .q small{display:block;font-size:14px;color:var(--muted);margin-top:8px}
+.gate .ev{grid-column:5;margin:0;max-width:none}
+.gate .ev .r{grid-template-columns:minmax(120px,1fr) auto;padding:7px 0}
+.gate .ev .r .val{text-align:right;color:var(--text)}
+.gate .verdict{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:12px;font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.gate.model{border:1px dashed var(--hold-bd);background:var(--hold-bg);border-radius:var(--r-card);padding:28px 24px 28px 0;margin:10px 0}
+.gate.model::before{border-color:var(--hold);border-style:dashed;background:var(--bg);left:0}
+.gate.model .n,.gate.model h3,.gate.model h3 small{color:var(--hold)}
+.gate.model .q{color:var(--text)}
+.gate.model .ev .r{border-color:rgba(210,153,34,.18)}
+.gate.model .ev .r span:first-child{color:var(--hold);opacity:.8}
+.machine-note{display:grid;grid-template-columns:34px 64px 170px minmax(0,1fr);gap:24px;padding:6px 0 26px}
+.machine-note p{grid-column:4;font-size:15.5px;color:var(--hold);max-width:56ch;line-height:1.55}
+.machine-out{display:grid;grid-template-columns:34px 1fr;gap:24px;padding:24px 0 0;align-items:center}
+.machine-out .ipath{grid-column:2}
+.ipath{display:flex;align-items:center;flex-wrap:wrap}
+.ipath li{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+.ipath li::after{content:"";width:28px;height:1px;background:var(--border);margin:0 12px}
+.ipath li:last-child::after{display:none}
+.ipath li i{width:6px;height:6px;border:1px solid var(--dim);border-radius:50%;flex:none}
+.ipath li.done{color:var(--muted)}.ipath li.done i{background:var(--muted);border-color:var(--muted)}
+.ipath li.ok{color:var(--allow)}.ipath li.ok i{background:var(--allow);border-color:var(--allow)}
+
+/* act II — kill -9 */
+.act{margin-top:20px}
+.act-cut{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:72px;align-items:end}
+.act-cut .was{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);line-height:2}
+.act-cut .was b{color:var(--muted);font-weight:400}
+.act-cut .was .now{color:var(--text)}
+.replay{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:72px;align-items:start;margin-top:64px}
+.states{position:relative;padding-left:34px}
+.states::before{content:"";position:absolute;left:5px;top:10px;bottom:12px;width:1px;background:var(--border)}
+.st{position:relative;padding:0 0 26px;opacity:.22;transition:opacity .45s ease}
+.st.on{opacity:1}
+.st::before{content:"";position:absolute;left:-34px;top:6px;width:11px;height:11px;border-radius:50%;background:var(--bg);border:1px solid var(--muted)}
+.st.good::before{border-color:var(--allow);background:var(--allow)}
+.st.warn::before{border-color:var(--hold)}
+.st.unsure::before{border-style:dashed}
+.st.bad::before{border-color:var(--block);background:var(--block);border-radius:1px}
+.st .s{font-family:var(--mono);font-size:15px;letter-spacing:.04em}
+.st .t{font-size:15px;color:var(--muted);margin-top:6px;max-width:40ch;line-height:1.5}
+.st .ticks{display:flex;gap:6px;margin-top:10px}
+.st .ticks i{width:20px;height:3px;background:var(--hold);opacity:.3}
+.st .ticks i.on{opacity:1}
+.st.big{padding:6px 0 34px}
+.st.big::before{display:none}
+.st.big p{font-size:clamp(30px,3.8vw,52px);line-height:1.02;letter-spacing:-.04em;font-weight:600;margin-left:-34px;max-width:12ch}
+.brk{position:relative;margin:2px 0 26px -34px;opacity:.22;transition:opacity .45s ease}
+.brk.on{opacity:1}
+.brk .r{display:flex;align-items:center;gap:12px}
+.brk .r::before{content:"";width:26px;height:1px;background:var(--block);opacity:.6}
+.brk .r::after{content:"";flex:1;height:1px;background:var(--block);opacity:.6}
+.brk b{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--block);font-weight:400;white-space:nowrap}
+.brk p{margin:10px 0 0 38px;font-size:15px;color:var(--muted);max-width:40ch}
+.replay-side{position:sticky;top:96px}
+.claims p{font-size:19px;line-height:1.5;color:var(--muted)}
+.claims p b{color:var(--text);font-weight:500}
+.media{margin-top:28px;border:1px solid var(--border);border-radius:var(--r-panel);aspect-ratio:16/9;position:relative;overflow:hidden}
+.media .corner{position:absolute;width:14px;height:14px;border-color:var(--dim);border-style:solid;border-width:0}
+.media .c1{top:12px;left:12px;border-top-width:1px;border-left-width:1px}
+.media .c2{top:12px;right:12px;border-top-width:1px;border-right-width:1px}
+.media .c3{bottom:12px;left:12px;border-bottom-width:1px;border-left-width:1px}
+.media .c4{bottom:12px;right:12px;border-bottom-width:1px;border-right-width:1px}
+.media .lbl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px}
+.media .lbl b{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:400}
+.media .lbl span{font-size:13px;color:var(--dim);max-width:34ch}
+.tbd{display:inline-flex;align-items:center;height:28px;padding:0 10px;border:1px dashed var(--hold-bd);border-radius:4px;font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--hold)}
+.media-cap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.04em}
+
+/* benchmark — a build artifact */
+.ci{margin-top:56px;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:72px;align-items:start}
+.ci .meta{font-family:var(--mono);font-size:13px;line-height:2.2;color:var(--muted)}
+.ci .meta b{color:var(--text);font-weight:400}
+.ci .meta .k{color:var(--dim)}
+.report{font-family:var(--mono);font-size:13.5px}
+.report .hd{display:flex;justify-content:space-between;color:var(--dim);font-size:11px;letter-spacing:.16em;text-transform:uppercase;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.report .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--hair)}
+.report .row .k{color:var(--text)}
+.report .row .k small{display:block;font-size:11.5px;color:var(--dim);margin-top:4px;letter-spacing:.02em}
+.report .row .v{display:flex;gap:8px;align-items:center;font-size:20px;letter-spacing:-.03em}
+.report .row .v .tbd{height:30px;font-size:13px}
+.report .ft{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-top:14px;color:var(--dim);font-size:11.5px;letter-spacing:.06em}
+.report .ft b{color:var(--hold);font-weight:400}
+
+/* adoption — three moves */
+.moves{margin-top:56px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:48px}
+.move .n{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--dim)}
+.move h3{font-size:22px;letter-spacing:-.025em;font-weight:600;margin-top:10px}
+.move p{margin-top:8px;color:var(--muted);font-size:15px}
+.term{margin-top:22px;border:1px solid var(--border);border-radius:var(--r-card);overflow:hidden}
+.term pre{margin:0;padding:16px 18px;font-family:var(--mono);font-size:12.5px;line-height:1.75;color:var(--muted);overflow-x:auto;white-space:pre}
+.term pre .p{color:var(--text)}.term pre .ok{color:var(--allow)}.term pre .q{color:var(--text)}.term pre .a{color:var(--link)}.term pre .c{color:var(--dim)}
+.term pre .del{color:var(--block);text-decoration:line-through;text-decoration-color:rgba(248,81,73,.55)}
+.term pre .add{color:var(--allow)}
+.move .trace{margin-top:22px;padding-left:28px}
+.move .tr{padding-bottom:20px}
+.move .tr::before{left:-28px;width:9px;height:9px;top:6px}
+.move .trace::before{left:4px}
+
+/* envelope */
+.env{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:72px;margin-top:56px}
+.env h3{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase}
+.env h3.is{color:var(--allow)}.env h3.not{color:var(--block)}
+.env ul{margin-top:20px}
+.env li{padding:12px 0;font-size:17px;display:grid;grid-template-columns:22px 1fr;gap:12px}
+.env li i{font-family:var(--mono);font-size:13px;color:var(--dim);padding-top:3px}
+.env li small{display:block;font-size:14px;color:var(--muted);margin-top:2px}
+.envelope{margin-top:56px;display:grid;grid-template-columns:200px 1fr;gap:32px;padding-top:26px;border-top:1px solid var(--border)}
+.envelope p{font-size:16px;color:var(--muted);max-width:70ch;line-height:1.6}
+.envelope p b{color:var(--text);font-weight:500}
+
+/* final */
+.final{padding:170px 0 110px}
+.final .big{font-size:clamp(34px,5vw,68px);line-height:1;letter-spacing:-.045em;font-weight:600;max-width:14ch}
+.final .big em{font-style:normal;color:var(--muted);font-weight:500;display:block}
+.final .sub{margin-top:30px;font-size:19px;color:var(--text);max-width:38ch}
+.final .sub small{display:block;font-size:15px;color:var(--muted);margin-top:8px}
+.final .actions{margin-top:36px}
+.final-grid{display:grid;grid-template-columns:minmax(0,1.06fr) minmax(0,.94fr);gap:72px;align-items:center}
+.final .trace{padding-left:34px}
+.final .trace .tr{padding-bottom:26px}
+.final .tr.ok::before{background:var(--allow);border-color:var(--allow)}
+
+footer{border-top:1px solid var(--hair);padding:30px 0 44px}
+.foot{display:flex;align-items:center;gap:26px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.foot .mark{margin-right:8px}
+.foot a:hover{color:var(--text)}
+.foot .note{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.04em}
+.disclosure{margin-top:14px;font-size:13px;color:var(--dim);max-width:72ch}
+
+.rv{opacity:0;transform:translateY(8px);transition:opacity .6s ease,transform .6s ease}
+.rv.in{opacity:1;transform:none}
+
+/* ═══════════════════ responsive ═══════════════════ */
+@media (max-width:1100px){
+  .gate{grid-template-columns:34px 56px 150px minmax(0,1fr)}
+  .gate .ev{grid-column:4;margin-top:16px;max-width:420px}
+  .machine-note{grid-template-columns:34px 56px 150px minmax(0,1fr)}
+  .moves{grid-template-columns:minmax(0,1fr);gap:44px}
+  .ci{grid-template-columns:minmax(0,1fr);gap:36px}
+}
+@media (max-width:860px){
+  :root{--gut:20px}
+  .nav{display:none}
+  .hero{padding:52px 0 0}
+  .hero-grid{grid-template-columns:minmax(0,1fr);gap:40px}
+  .readout{grid-template-columns:minmax(0,1fr);border-top:0}
+  .ro,.ro+.ro{padding:16px 0;border-left:0;border-top:1px solid var(--hair)}
+  .trace-svg{display:none}
+  .trace-mobile{display:block;margin-top:22px}
+  .chapter{padding:104px 0 0}
+  .two,.two.wide-r,.two.wide-l,.replay,.env,.act-cut,.bound-foot{grid-template-columns:minmax(0,1fr);gap:44px}
+  .valid{grid-template-columns:minmax(0,1fr);gap:40px}
+  .boundary{padding:120px 0 100px}
+  .bound{margin-top:56px}
+  .gate{grid-template-columns:34px minmax(0,1fr);gap:10px 18px;padding:24px 0}
+  .gate .n{grid-column:2}
+  .gate h3,.gate .q,.gate .ev{grid-column:2}
+  .gate.model{padding:22px 16px 22px 0}
+  .machine-note{grid-template-columns:34px minmax(0,1fr)}
+  .machine-note p{grid-column:2}
+  .machine-out{grid-template-columns:1fr}
+  .machine-out .ipath{grid-column:1}
+  .ipath{gap:8px 18px}
+  .ipath li::after{display:none}
+  .replay-side{position:static}
+  .st.big p{margin-left:0;max-width:none}
+  .envelope{grid-template-columns:minmax(0,1fr);gap:12px}
+  .final{padding:120px 0 80px}
+  .final-grid{grid-template-columns:minmax(0,1fr);gap:52px}
+  .foot .note{margin-left:0;width:100%}
+  .ev .r{grid-template-columns:minmax(0,1fr)}
+  .gate .ev .r{grid-template-columns:minmax(0,1fr) auto}
+}
+@media (max-width:560px){
+  .actions .btn{flex:1 1 auto;justify-content:center}
+  .cmd{width:100%}
+  .cmd button{margin-left:auto}
+  .tr .v{font-size:26px}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  .trace-svg .draw{stroke-dashoffset:0}
+  .trace-svg .fade{opacity:1}
+  .rv,.gate,.st,.brk{opacity:1;transform:none}
+}
+/* gl:css:start */
+/* ═══════════════════ the x-ray ═══════════════════
+   One fixed WebGL canvas (#gl) sits above the in-flow page and below the header, pointer-transparent.
+   It only paints inside .stage rectangles; there it paints the page background first, so a stage
+   can pin over scrolling text on small screens. Everything with words stays in the DOM (z 2).
+   No class on <html> → none of this applies and the page is exactly its 2D self.          */
+#gl{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100lvh;z-index:1;pointer-events:none;display:none;opacity:0;transition:opacity .9s ease}
+.gl #gl{display:block}
+.gl.ready #gl{opacity:1}
+.stage{position:relative;z-index:2}
+.xr{display:none}
+.gl .xr{display:block;position:absolute;inset:0;pointer-events:none;font-family:var(--mono)}
+.xr-in{position:absolute;inset:0;max-width:var(--max);margin:0 auto;padding:0 var(--gut)}
+.xr-sr{display:none}
+.gl .xr-sr{display:block}
+.xr-boot{position:absolute;left:64%;top:52%;transform:translate(-50%,-50%);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+.ready .xr-boot{display:none}
+section[id]{scroll-margin-top:78px}
+
+/* projected labels — real type, positioned from the scene each frame. Two sizes: the eyebrow and the readout value. */
+.xr-labels{position:absolute;inset:0;overflow:hidden}
+.lab{position:absolute;left:0;top:0;white-space:nowrap;font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);opacity:0;transition:opacity .4s ease;will-change:transform;line-height:1.5}
+.lab.on{opacity:1}
+.lab.hi{color:var(--muted)}
+.lab.txt{color:var(--text)}
+.lab.bad{color:var(--block)}.lab.ok{color:var(--allow)}.lab.hold{color:var(--hold)}
+.lab.evd{text-transform:none;letter-spacing:.02em;font-size:12px;color:var(--dim)}
+.lab.evd b{color:var(--text);font-weight:400}
+.lab.evd.hi{color:var(--muted)}
+.lab.evd .k{display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
+.lab.evd .red{color:var(--block)}
+.lab.sans{font-family:var(--sans);font-size:15.5px;letter-spacing:0;text-transform:none;color:var(--muted)}
+.lab.sans b{color:var(--text);font-weight:500}
+.lab.big{font-size:clamp(22px,2.4vw,30px);letter-spacing:-.04em;text-transform:none;color:var(--text);line-height:1}
+.lab.big.bad{color:var(--block)}
+.lab.big.ok{color:var(--allow)}
+.lab.big.hold{color:var(--hold)}
+.lab.big small{display:block;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-top:8px}
+.lab.chip{height:24px;display:inline-flex;align-items:center;gap:10px;padding:0 9px;border:1px solid var(--block-bd);border-radius:4px;font-size:11px;letter-spacing:.1em;color:var(--block)}
+.lab.chip i{font-style:normal;color:var(--dim);letter-spacing:.16em}
+.lab .tick{display:inline-block;width:10px;height:1px;background:currentColor;vertical-align:middle;margin-right:8px;opacity:.7}
+
+/* the index at the viewport edge: which layer the camera is in, and how much of the sequence is left */
+.xr-index{position:absolute;right:var(--gut);top:calc(58px + 26px);display:grid;gap:5px;justify-items:end;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);text-align:right;opacity:0;transition:opacity .4s ease}
+.xr-index.on{opacity:1}
+.xr-index .v{color:var(--text)}
+.xr-index .bar{display:block;position:relative;width:120px;height:1px;background:var(--border);margin-top:4px}
+.xr-index .bar b{position:absolute;left:0;top:0;height:100%;width:0;background:var(--muted)}
+.dive-index{right:0;top:0}
+
+/* captions: three in the whole sequence — the threshold, the verdict, the mechanism */
+.xr-caps{position:absolute;left:var(--gut);bottom:12vh;width:min(40ch,calc(100% - 2*var(--gut)))}
+.xr-cap{position:absolute;left:0;bottom:0;width:100%;opacity:0;transform:translateY(6px);transition:opacity .45s ease,transform .45s ease}
+.xr-cap.on{opacity:1;transform:none}
+.xr-cap .k{display:block;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.xr-cap p{font-family:var(--sans);font-size:17px;line-height:1.45;color:var(--muted);text-transform:none;letter-spacing:0}
+.xr-cap p b{color:var(--text);font-weight:500}
+.xr-cap[data-cap="stop"] .k{color:var(--block)}
+
+/* hero. Without .gl the track is the old two-column hero grid; with .gl it is a scroll track holding a pinned stage. */
+.track-hero{width:100%;max-width:var(--max);margin:0 auto;padding:0 var(--gut);display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:64px;align-items:end}
+.hero-copy-wrap{min-width:0}
+.hero-grid{display:block}
+.xr-hint{display:none}
+.motion .xr-hint{display:block;margin-top:34px;font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.motion .xr-hint b{font-weight:400;display:inline-block;animation:nudge 2.4s ease-in-out infinite}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+.gl .hero{padding:0}
+.gl .track-hero{max-width:none;padding:0;display:block;position:relative}
+.motion .track-hero{height:520vh}
+.gl .hero-copy-wrap{position:sticky;top:0;height:0;z-index:3;max-width:var(--max);margin:0 auto;padding:0 var(--gut)}
+.gl .hero-copy{position:absolute;top:calc(58px + 6vh);left:var(--gut);max-width:560px;will-change:opacity,transform}
+.gl .hero h1{margin-top:18px;font-size:clamp(28px,2.7vw,38px)}
+.gl .hero .actions{margin-top:26px}
+.gl .stage-hero{height:100svh;min-height:600px;overflow:hidden}
+.motion .stage-hero{position:sticky;top:0}
+.gl .hero-grid{position:absolute;inset:0;max-width:var(--max);margin:0 auto;padding:0 var(--gut);display:flex;flex-direction:column;justify-content:flex-end}
+.gl .readout{will-change:opacity,transform;padding-bottom:26px;background:linear-gradient(to top,rgba(12,14,17,.92) 60%,rgba(12,14,17,0))}
+.gl .hero-copy.gone,.gl .readout.gone{pointer-events:none}
+.gl .trace-wrap{display:none}
+.gl #incident .tr .v{font-size:clamp(22px,2.2vw,30px)}
+
+/* chapter 02 — the dive */
+.stage-dive{display:none}
+.gl .dive{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.58fr);gap:0 56px;align-items:start}
+.gl .stage-dive{display:block;position:sticky;top:78px;height:calc(100svh - 100px);min-height:420px;max-height:760px;margin-top:64px;align-self:start}
+.gl .stage-dive.hovering .xr{cursor:pointer}
+.gl .stage-dive .xr-labels{pointer-events:auto}
+.gl .gate{grid-template-columns:34px 56px 150px minmax(0,1fr)}
+.gl .gate .ev{grid-column:4;margin-top:16px;max-width:440px}
+.gl .machine-note{grid-template-columns:34px 56px 150px minmax(0,1fr)}
+.gl .gate.focus::before{background:var(--text);border-color:var(--text)}
+.gl .gate.model.focus::before{background:var(--hold);border-color:var(--hold)}
+
+/* chapter 04 — durability */
+.stage-kill{display:none}
+.gl .replay{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"states stage" "claims media";row-gap:72px}
+.gl .states{grid-area:states}
+.gl .stage-kill{display:block;grid-area:stage;position:sticky;top:96px;aspect-ratio:4/3;max-height:calc(100svh - 130px);align-self:start}
+.gl .replay-side{display:contents}
+.gl .claims{grid-area:claims}
+.gl .mediawrap{grid-area:media}
+.gl .claims p{max-width:46ch}
+.motion .st{padding-bottom:48px}
+.motion .st.unsure{padding-bottom:88px}
+.motion .st.big{padding:24px 0 96px}
+.motion .brk{margin-bottom:56px}
+.motion .st.on,.motion .brk.on{transition-duration:.25s}
+
+/* the invitation — the clean path */
+.stage-cta{display:none}
+.gl .final-side{display:grid;gap:34px}
+.gl .stage-cta{display:block;aspect-ratio:16/10}
+.gl .final .trace .tr,.gl .final .trace .cutline{opacity:.3;transition:opacity .5s ease}
+.gl .final .trace .lit{opacity:1}
+
+/* chapter 06 — the handoff */
+.adopt-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.95fr);gap:72px;align-items:end}
+.handoff{display:flex;align-items:stretch;font-family:var(--mono);justify-self:end;width:100%;max-width:560px}
+.ho-node{display:flex;flex-direction:column;justify-content:center;gap:6px;padding:14px 0;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);min-width:0}
+.ho-node b{font-weight:400;color:var(--muted)}
+.ho-node span{text-transform:none;letter-spacing:.02em;font-size:12px;color:var(--dim);overflow-wrap:anywhere}
+.ho-node.on{padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-ctl);color:var(--text)}
+.ho-node.on b{color:var(--text)}
+.ho-node.on span{color:var(--link)}
+.ho-link{flex:1 1 28px;min-width:22px;position:relative}
+.ho-link::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--border)}
+.ho-link::after{content:"";position:absolute;right:0;top:50%;width:5px;height:5px;border-right:1px solid var(--muted);border-top:1px solid var(--muted);transform:translateY(-50%) rotate(45deg)}
+.ho-cut{position:relative;width:1px;margin:0 22px 0 8px;border-left:1px dashed var(--hold);opacity:.9}
+.ho-cut b{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--hold);font-weight:400;white-space:nowrap}
+
+/* chapter 05 — telemetry rows arrive one at a time; the values stay whatever RESULTS.md says */
+.ci .meta>div,.ci .report .row{opacity:0;transform:translateY(4px);transition:opacity .5s ease,transform .5s ease}
+.ci.in .meta>div,.ci.in .report .row{opacity:1;transform:none}
+.ci.in .meta>div:nth-child(2){transition-delay:.08s}.ci.in .meta>div:nth-child(3){transition-delay:.16s}.ci.in .meta>div:nth-child(4){transition-delay:.24s}.ci.in .meta>div:nth-child(5){transition-delay:.32s}
+.ci.in .report .row:nth-of-type(1){transition-delay:.25s}.ci.in .report .row:nth-of-type(2){transition-delay:.4s}.ci.in .report .row:nth-of-type(3){transition-delay:.55s}.ci.in .report .row:nth-of-type(4){transition-delay:.7s}
+
+@media (max-width:1100px){
+  .gl .dive{grid-template-columns:minmax(0,1fr) minmax(260px,.5fr);gap:0 40px}
+  .adopt-head{grid-template-columns:minmax(0,1fr);gap:44px}
+  .handoff{justify-self:start}
+}
+@media (max-width:860px){
+  .track-hero{grid-template-columns:minmax(0,1fr);gap:40px}
+  .gl .hero-copy-wrap{position:static;height:auto;padding:52px var(--gut) 30px}
+  .gl .hero-copy{position:static;max-width:none}
+  .gl .hero h1{font-size:clamp(28px,7vw,34px)}
+  .gl .stage-hero{min-height:520px}
+  .gl .readout{grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--hair);padding-bottom:18px}
+  .gl .ro,.gl .ro+.ro{padding:14px 0 0 0;border-top:0;border-left:0}
+  .gl .ro+.ro{padding-left:14px;border-left:1px solid var(--hair)}
+  .gl .ro .v{font-size:20px}
+  .gl .ro .k{font-size:9px}
+  .gl .ro .s{display:none}
+  .xr-index{top:calc(58px + 16px)}
+  .xr-caps{bottom:calc(12vh + 64px)}
+  .xr-cap p{font-size:15px}
+  .lab.evd{font-size:11px}
+  .lab.sans{font-size:14px}
+  .gl .dive{display:flex;flex-direction:column}
+  .gl .stage-dive{order:-1;position:sticky;top:58px;height:34svh;min-height:220px;max-height:340px;margin:24px 0 8px;width:100%}
+  .gl .stage-dive .dive-index{top:8px;right:0}
+  .gl .replay{grid-template-columns:minmax(0,1fr);grid-template-areas:"stage" "states" "claims" "media"}
+  .gl .stage-kill{position:sticky;top:58px;aspect-ratio:auto;height:34svh;min-height:220px;max-height:340px;z-index:3}
+  .motion .st{padding-bottom:40px}
+  .gl .final-side{gap:26px}
+  .handoff{flex-direction:column;max-width:none}
+  .ho-link{flex:0 0 28px;width:1px;margin-left:14px}
+  .ho-link::before{left:0;right:auto;top:0;bottom:0;width:1px;height:auto}
+  .ho-link::after{right:auto;left:-2px;top:auto;bottom:0;transform:rotate(135deg)}
+  .ho-cut{width:auto;height:1px;border-left:0;border-top:1px dashed var(--hold);margin:10px 0 16px}
+  .ho-cut b{left:0;bottom:calc(100% + 6px);transform:none}
+}
+@media (max-height:620px){
+  .gl .readout{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .ci .meta>div,.ci .report .row{opacity:1;transform:none}
+  .lab,.xr-cap,.xr-index{transition:none}
+}
+/* gl:css:end */
+</style>
+</head>
+<body>
+<a class="sr" href="#main">Skip to content</a>
+
+<header class="top" id="top">
+  <div class="wrap top-in">
+    <a class="mark" href="#top" aria-label="Interlock — home">
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1.5" y="1.5" width="8" height="8" stroke="currentColor" stroke-width="1.2"/><rect x="6.5" y="6.5" width="8" height="8" stroke="currentColor" stroke-width="1.2"/></svg>
+      Interlock
+    </a>
+    <nav class="nav" aria-label="Site">
+      <a href="#gates">The gates</a>
+      <a href="#boundary">The boundary</a>
+      <a href="#kill9">Exactly-once</a>
+      <a data-link="github" href="#">GitHub</a>
+    </nav>
+    <div class="cta"><a class="btn primary" data-link="github" href="#">View the source <span class="arr">→</span></a></div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ═══════════════ hero — the opening frame of an incident ═══════════════ -->
+<section class="hero" id="hero" aria-labelledby="h1">
+  <!-- the x-ray: under html.motion this track is tall and the stage pins while the camera moves through the system -->
+  <div class="track track-hero" id="track-hero">
+    <!-- the words live on the AI side of the scene: on desktop they pin over it, on phones they scroll away before the camera moves -->
+    <div class="hero-copy-wrap" id="hero-copy-wrap">
+      <div class="hero-copy">
+        <p class="eyebrow on">deterministic money controls for AI agents</p>
+        <h1 id="h1">What you put between an AI agent and a payment API <em>so it cannot pay twice, and cannot pay more than you authorised.</em></h1>
+        <p class="lede"><b>AI can propose.</b> Interlock decides. The rail only ever sees deterministic code.</p>
+        <div class="actions">
+          <div class="cmd" role="group" aria-label="Install command">
+            <span class="p">$</span><span>npx interlock-mcp</span><span class="cur" aria-hidden="true"></span>
+            <button type="button" data-copy="npx interlock-mcp" aria-label="Copy install command">copy</button>
+          </div>
+          <a class="btn primary" data-link="npm" href="#">Get it on npm <span class="arr">→</span></a>
+          <a class="btn ghost" data-link="github" href="#">View on GitHub <span class="arr">↗</span></a>
+        </div>
+        <p class="xr-hint" aria-hidden="true">scroll · enter the proxy <b>↓</b></p>
+      </div>
+    </div>
+    <div class="stage stage-hero" id="stage-hero" data-slot="hero">
+      <div class="hero-grid">
+        <dl class="readout" aria-label="Incident readout">
+          <div class="ro"><dt class="k">the agent proposed</dt><dd class="v">₹48,000</dd><dd class="s">create_refund · support-agent</dd></div>
+          <div class="ro"><dt class="k">the rail authorised</dt><dd class="v">₹1,899</dd><dd class="s">order_A8841 · resolved</dd></div>
+          <div class="ro"><dt class="k">interlock</dt><dd class="v">BLOCKED</dd><dd class="s">gate 02 · rail call 0</dd></div>
+        </dl>
+      </div>
+
+      <!-- x-ray annotations. Positions come from the scene; the words are the same facts as the 2D trace. -->
+      <div class="xr" aria-hidden="true">
+        <div class="xr-in">
+          <div class="xr-index"><span class="k">system trace</span><span class="v" data-xr="layer">ai agent</span><i class="bar"><b data-xr="bar"></b></i></div>
+          <div class="xr-caps">
+            <div class="xr-cap" data-cap="proxy"><span class="k">mcp · interlock proxy</span><p>The agent no longer talks to money. Every tool call enters through Interlock's MCP proxy, and past this plane <b>only deterministic code runs.</b> The request was well-formed. What it lacks is authority.</p></div>
+            <div class="xr-cap" data-cap="stop"><span class="k">gate 02 · block</span><p>Interlock resolved the order itself, read-only. <b>₹48,000 has no authority. ₹1,899 does.</b> BLOCK is absorbing: gates 03 to 06 never ran, no intent was written, the rail was never called.</p></div>
+            <div class="xr-cap" data-cap="reveal"><span class="k">the mechanism</span><p><b>That is the entire mechanism.</b> One mandate, six gates in order, a durable intent, one rail call at most. This request stopped at the second gate.</p></div>
+          </div>
+        </div>
+        <div class="xr-labels" data-labels></div>
+        <div class="xr-boot">initializing interlock trace</div>
+      </div>
+      <p class="sr xr-sr">A support agent proposes create_refund for ₹48,000. The request crosses the Interlock MCP proxy, the line where AI stops and deterministic code begins. It passes the human-approved mandate and gate 01, scope. Gate 02 resolves order_A8841 over Interlock's own read-only client and finds ₹1,899 of authority, so the request is blocked with VALUE_NOT_AUTHORISED. Gates 03 to 06, the intent and the money-moving rail call were never reached. Rail call 0.</p>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- the system trace: the signature. Under html.gl it is the textual fallback, the scene above carries it. -->
+    <div class="trace-wrap">
+      <div class="trace-cap">
+        <span class="eyebrow">live trace · one proposed action</span>
+        <span class="eyebrow">agent → mandate → gates → intent → rail</span>
+      </div>
+
+      <svg class="trace-svg" viewBox="0 0 1200 210" role="img" aria-labelledby="tr-t tr-d">
+        <title id="tr-t">System trace of the blocked refund</title>
+        <desc id="tr-d">A support agent proposes a ₹48,000 refund. Past the boundary marked "AI stops here", only deterministic code runs: the mandate, then six gates. Gate 02 resolves the order from the rail, finds ₹1,899 of authority, and blocks. The intent and the rail were never reached; the rail call count is zero.</desc>
+
+        <line class="bound fade" style="animation-delay:.35s" x1="268" y1="16" x2="268" y2="196"/>
+        <text class="fade" style="animation-delay:.45s" x="254" y="26" text-anchor="end">the agent proposes</text>
+        <text class="fade hi" style="animation-delay:.45s" x="284" y="26">ai stops here · deterministic execution begins</text>
+
+        <line class="rail draw" x1="100" y1="104" x2="640" y2="104"/>
+        <line class="rail after fade" style="animation-delay:1.5s" x1="640" y1="104" x2="1150" y2="104"/>
+
+        <g class="fade" style="animation-delay:.5s">
+          <circle class="node fill" cx="150" cy="104" r="6"/>
+          <text x="150" y="138" text-anchor="middle" class="on">agent</text>
+          <text x="150" y="158" text-anchor="middle">create_refund · ₹48,000</text>
+        </g>
+        <g class="fade" style="animation-delay:.8s">
+          <circle class="node" cx="400" cy="104" r="6"/>
+          <text x="400" y="138" text-anchor="middle" class="on">mandate</text>
+          <text x="400" y="158" text-anchor="middle">yaml · approved by a human</text>
+        </g>
+        <g class="fade" style="animation-delay:1.1s">
+          <circle class="node" cx="640" cy="104" r="6"/>
+          <text x="640" y="138" text-anchor="middle" class="on">gates</text>
+          <text x="640" y="158" text-anchor="middle">six deterministic checks</text>
+          <g aria-hidden="true" id="pips">
+            <rect class="g pass" x="602" y="70" width="9" height="9" rx="1"/>
+            <rect class="g stop" x="615" y="70" width="9" height="9" rx="1"/>
+            <rect class="g dimmed" x="628" y="70" width="9" height="9" rx="1"/>
+            <rect class="g dimmed" x="641" y="70" width="9" height="9" rx="1"/>
+            <rect class="g model dimmed" x="654" y="70" width="9" height="9" rx="1"/>
+            <rect class="g dimmed" x="667" y="70" width="9" height="9" rx="1"/>
+          </g>
+        </g>
+        <g class="fade" style="animation-delay:1.5s">
+          <circle class="node never" cx="890" cy="104" r="6"/>
+          <text x="890" y="138" text-anchor="middle">intent</text>
+          <text x="890" y="158" text-anchor="middle">never written</text>
+        </g>
+        <g class="fade" style="animation-delay:1.6s">
+          <circle class="node never" cx="1110" cy="104" r="6"/>
+          <text x="1110" y="138" text-anchor="middle">rail</text>
+          <text x="1110" y="158" text-anchor="middle">rail call 0</text>
+        </g>
+
+        <circle id="sig" class="sig" cx="150" cy="104" r="4" opacity="0"/>
+        <g id="stopmark" opacity="0">
+          <text class="bad" x="640" y="46" text-anchor="middle">blocked · gate 02</text>
+          <text class="bad" x="640" y="190" text-anchor="middle">value_not_authorised</text>
+        </g>
+      </svg>
+
+      <!-- mobile: the same trace, vertical -->
+      <ol class="trace trace-mobile" aria-label="System trace">
+        <li class="tr done"><div class="k">ai agent</div><div class="v small">create_refund</div><div class="m">₹48,000 proposed · support-agent</div></li>
+        <li class="cutline"><b>ai stops here</b></li>
+        <li class="tr done"><div class="k">mandate</div><div class="v small">approved yaml</div></li>
+        <li class="tr stop"><div class="k">gate 02 · value</div><div class="v small v-block">BLOCKED</div><div class="m">value_not_authorised · ₹1,899 authorised</div></li>
+        <li class="tr never"><div class="k">intent</div><div class="v small">never written</div></li>
+        <li class="tr never"><div class="k">rail</div><div class="v small">rail call 0</div></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ chapter 01 — the proposal, the authority, the decision ═══════════════ -->
+<section class="chapter" id="incident" aria-labelledby="h-inc">
+  <div class="wrap">
+    <div class="two wide-l">
+      <div class="rv">
+        <p class="eyebrow ch-num">chapter 01 · the proposal</p>
+        <h2 class="h2" id="h-inc">The agent asked for ₹48,000. <em>The order authorised ₹1,899.</em></h2>
+        <p class="lead">Correct tool. Valid enum. Well-typed integer. Nothing in the stack checked what the number <b>meant</b> — until something resolved the order from the rail and compared against it.</p>
+
+      </div>
+
+      <ol class="trace rv" aria-label="Incident reconstruction">
+        <li class="tr done">
+          <div class="k">request</div>
+          <div class="v">₹48,000</div>
+          <div class="m">support-agent · create_refund</div>
+        </li>
+        <li class="tr done">
+          <div class="k">resolved authority</div>
+          <div class="v">₹1,899</div>
+          <div class="m">order_A8841 · fetched over interlock's own read-only client</div>
+          <div class="ev" aria-label="Evidence the gate resolved">
+            <div class="r"><span>resolved_order</span><span>order_A8841</span></div>
+            <div class="r"><span>order_amount_minor</span><span>4800000<span class="f">₹48,000</span></span></div>
+            <div class="r hi"><span>claimed_line_item_minor</span><span>189900<span class="f">₹1,899</span></span></div>
+            <div class="r"><span>return_record</span><span class="n">null</span></div>
+          </div>
+          <p class="eyebrow ev-cap">the agent's number was never treated as authority</p>
+        </li>
+        <li class="tr stop">
+          <div class="k">gate 02 · value authorisation</div>
+          <div class="v v-block">BLOCK</div>
+          <div class="m"><span class="code block">VALUE_NOT_AUTHORISED</span></div>
+          <div class="s">The refund exceeded the value the resolved order authorised. BLOCK is absorbing — gates 03 to 06 never ran.</div>
+        </li>
+        <li class="tr never">
+          <div class="k">rail</div>
+          <div class="v">NOT CALLED</div>
+          <div class="m">rail call 0 · nothing was written, nothing was reversed</div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="valid rv">
+          <div class="ok">
+            <h3>It looked valid.</h3>
+            <ul aria-label="What was valid">
+              <li>valid tool</li><li>valid enum</li><li>valid integer</li><li>valid schema</li>
+            </ul>
+          </div>
+          <div class="no">
+            <h3>It was <em>still wrong.</em></h3>
+            <ul aria-label="What was wrong">
+              <li>wrong amount</li><li>wrong authority</li><li>stale context</li>
+              <li>unknown previous state</li><li>dead process ≠ failed payment</li>
+            </ul>
+          </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ chapter 02 — the machine ═══════════════ -->
+<section class="chapter" id="gates" aria-labelledby="h-gates">
+  <div class="wrap">
+    <div class="rv" style="max-width:60ch">
+      <p class="eyebrow ch-num">chapter 02 · the decision</p>
+      <h2 class="h2" id="h-gates">Six gates, in order. <em>A gate can only ever lower the verdict.</em></h2>
+      <p class="lead">Question, evidence, verdict — six times, deterministically. Each gate can hold what the last one allowed, never the reverse, and BLOCK stops the ladder where it stands. Every gate stores what it resolved, so any decision replays bit-for-bit without touching the rail.</p>
+    </div>
+
+    <div class="dive">
+    <div class="machine" role="list">
+      <div class="gate det" role="listitem">
+        <span class="n">01</span><h3>Scope<small>deterministic</small></h3>
+        <div class="q">Is this tool granted to this agent, by a mandate that has not expired?</div>
+        <div class="ev">
+          <div class="r"><span>granted_tools</span><span class="val">create_refund</span></div>
+          <div class="r"><span>mandate</span><span class="val">sha256:9f2c…</span></div>
+          <div class="verdict"><span>verdict</span><span class="v-allow">pass</span></div>
+        </div>
+      </div>
+
+      <div class="gate det" role="listitem">
+        <span class="n">02</span><h3>Value<small>deterministic</small></h3>
+        <div class="q">What does the rail actually authorise?<small>Interlock resolves the referent itself. The amount in the agent's arguments is never authority.</small></div>
+        <div class="ev">
+          <div class="r"><span>agent proposed</span><span class="val v-block">₹48,000</span></div>
+          <div class="r"><span>resolved order</span><span class="val">₹1,899</span></div>
+          <div class="verdict"><span class="code block">VALUE_NOT_AUTHORISED</span><span class="v-block">block</span></div>
+        </div>
+      </div>
+
+      <div class="gate det" role="listitem">
+        <span class="n">03</span><h3>Limits<small>deterministic</small></h3>
+        <div class="q">Does it stay inside the ceiling, the velocity window and the fee budget?<small>Fees are read from rail responses, never from a rate table.</small></div>
+        <div class="ev">
+          <div class="r"><span>catches</span><span class="val">runaway volume · fee burn</span></div>
+          <div class="verdict"><span>verdict</span><span>allow · hold</span></div>
+        </div>
+      </div>
+
+      <div class="gate det" role="listitem">
+        <span class="n">04</span><h3>Exactly once<small>deterministic</small></h3>
+        <div class="q">Has this semantic action already happened?<small>A semantic idempotency key, a write-ahead log and a state machine. A duplicate is a state that exists, not a guess.</small></div>
+        <div class="ev">
+          <div class="r"><span>catches</span><span class="val">the retry storm</span></div>
+          <div class="verdict"><span class="code">ALREADY_APPLIED</span><span class="v-block">block</span></div>
+        </div>
+      </div>
+
+      <div class="gate model" role="listitem">
+        <span class="n">05</span><h3>Purpose<small>model · off by default</small></h3>
+        <div class="q">Does the action match the stated purpose?<small>Advisory and downgrade-only. A model gate cannot express ALLOW — the verdict type has no such member.</small></div>
+        <div class="ev">
+          <div class="r"><span>opt-in with</span><span class="val">--purpose-check</span></div>
+          <div class="r"><span>can return</span><span class="val">hold · block</span></div>
+          <div class="verdict"><span>can never return</span><span class="v-allow">allow</span></div>
+        </div>
+      </div>
+      <div class="machine-note rv"><p>The model is here. And only here. With it off — the default — the ladder contains no model at all, and the money path is deterministic end to end.</p></div>
+
+      <div class="gate det" role="listitem">
+        <span class="n">06</span><h3>Provenance<small>deterministic</small></h3>
+        <div class="q">Is this still the tool manifest that was approved?<small>Hash-pinned. A changed description or a crossed trust tier stops here — the agent never sees the new text.</small></div>
+        <div class="ev">
+          <div class="r"><span>manifest</span><span class="val">sha256:9f2c… · 41 tools</span></div>
+          <div class="verdict"><span>catches</span><span>manifest drift</span></div>
+        </div>
+      </div>
+
+      <div class="machine-out rv">
+        <ol class="ipath" aria-label="After the ladder">
+          <li class="done"><i></i>decision</li>
+          <li class="done"><i></i>durable intent</li>
+          <li class="done"><i></i>rail · at most once</li>
+          <li class="ok"><i></i>outcome verified</li>
+        </ol>
+      </div>
+    </div>
+      <div class="stage stage-dive" data-slot="dive" role="img" aria-label="The Interlock stack in three dimensions: the mandate, six gate frames in order with gate 05 set apart as a dashed amber optional model layer, then the durable intent and the payment rail. The layer in focus follows the gate being read.">
+        <div class="xr" aria-hidden="true">
+          <div class="xr-index dive-index"><span class="k">system trace</span><span class="v" data-xr="layer">the stack</span><i class="bar"><b data-xr="bar"></b></i></div>
+          <div class="xr-labels" data-labels></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ chapter 03 — the boundary ═══════════════ -->
+<section class="boundary" id="boundary" aria-labelledby="h-bound">
+  <div class="wrap">
+    <p class="eyebrow" style="text-align:center">chapter 03 · the boundary</p>
+    <h2 class="h2 bound-stmt" id="h-bound">The model reads and writes English. <em>Deterministic code touches the money.</em></h2>
+
+    <div class="bound rv" role="img" aria-label="The model handles English at authoring time. Below the line marked AI stops here, only deterministic code runs: gates, intent, reconciliation, and the rail.">
+      <div class="pole">model</div>
+      <div class="stem"></div>
+      <div class="items">english<br>policy<br>interpretation</div>
+      <div class="stem long"></div>
+      <div class="cut">ai stops here<small>gate 05 is advisory, downgrade-only, and off by default</small></div>
+      <div class="stem long"></div>
+      <div class="items d">gates<br>intent<br>reconciliation<br>rail</div>
+      <div class="stem"></div>
+      <div class="pole">money</div>
+    </div>
+
+    <div class="bound-foot rv">
+      <p><b>Above the line</b> the model interprets plain English into a mandate, at authoring time, behind a human approval. At runtime it is optional, and it can only ever hold or block. It cannot allow.</p>
+      <p><b>Below the line</b> every rupee of arithmetic, every limit, every retry decision is code that can be read, tested and replayed — scope, value, limits, exactly-once, provenance, rail execution, ledger verification.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ chapter 04 — act two ═══════════════ -->
+<section class="chapter" id="kill9" aria-labelledby="h-kill">
+  <div class="wrap">
+    <div class="act-cut rv">
+      <div style="max-width:34ch">
+        <p class="eyebrow ch-num">chapter 04 · the second failure</p>
+        <h2 class="h2" id="h-kill">Then a good request was interrupted mid-flight.</h2>
+      </div>
+      <div class="was">
+        <div>act i &nbsp;<b>a wrong proposal never reached the rail</b></div>
+        <div class="now">act ii &nbsp;a correct proposal reached it — and the process died before the answer came back</div>
+      </div>
+    </div>
+
+    <div class="replay">
+      <ol class="states" id="states" aria-label="Intent state replay">
+        <li class="st"><div class="s">PROPOSED</div><div class="t">SIK derived from merchant, tool, subject, amount and reason. Row inserted.</div></li>
+        <li class="st good"><div class="s v-allow">AUTHORIZED</div><div class="t">Gates 01–04 cleared. ₹2,800 refund on an approved return.</div></li>
+        <li class="st"><div class="s">IN_FLIGHT</div><div class="t">Write-ahead record fsynced <em>before</em> the call. Lease taken, +30s.</div></li>
+        <li class="brk"><div class="r"><b>process terminated</b></div><p>The durable intent survived. The process did not.</p></li>
+        <li class="st warn unsure"><div class="s v-hold">UNKNOWN</div><div class="t">Found on disk at boot, lease expired. A timeout is not a failure — we do not know what the rail did.</div></li>
+        <li class="st big"><p>Unknown never means retry.</p></li>
+        <li class="st warn"><div class="s v-hold">RECONCILING <span style="color:var(--dim)">×6</span></div><div class="t">Asking the rail what happened, with full pagination. Absence only counts once the pages run out.</div>
+          <div class="ticks" aria-label="six reconcile attempts"><i></i><i></i><i></i><i></i><i></i><i></i></div></li>
+        <li class="st bad"><div class="s v-block">QUARANTINED</div><div class="t">Six passes, no answer. A named human decides — applied, or confirmed not applied. Never a blind retry.</div></li>
+      </ol>
+
+      <div class="stage stage-kill" data-slot="kill" role="img" aria-label="A durable intent record is written to disk before the rail is called. The running process is terminated mid-call and fades; the record stays. A new process starts, finds the record on disk with its lease expired, and marks it UNKNOWN without retrying. Six reconciliation passes ask the rail what happened; none can say, so the record is quarantined for a named human.">
+        <div class="xr" aria-hidden="true"><div class="xr-labels" data-labels></div></div>
+      </div>
+      <div class="replay-side">
+        <div class="claims rv">
+          <p><b>Naive handlers map unknown to failed, failed to retry.</b> That single mapping is the whole duplicate refund. Interlock writes the intent to disk before the call, so a dead process is recoverable — and never retried blind.</p>
+        </div>
+        <div class="mediawrap rv">
+          <div class="media" role="img" aria-label="Placeholder for the twenty-second kill -9 demonstration loop">
+            <span class="corner c1"></span><span class="corner c2"></span><span class="corner c3"></span><span class="corner c4"></span>
+            <div class="lbl">
+              <b>kill -9 · exactly-once</b>
+              <span>Twenty-second loop: a refund starts, the gate is killed mid-call, restarts, recovers, and the rail shows one refund.</span>
+              <span class="tbd">recording pending</span>
+            </div>
+          </div>
+          <div class="media-cap"><span>20s loop · mock rail</span><span>the restart wait will not be edited out</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ chapter 05 — the evidence ═══════════════ -->
+<section class="chapter" id="bench" aria-labelledby="h-bench">
+  <div class="wrap">
+    <div class="rv" style="max-width:56ch">
+      <p class="eyebrow ch-num">chapter 05 · the evidence</p>
+      <h2 class="h2" id="h-bench">Numbers come from the pipeline, <em>or they do not go on the page.</em></h2>
+    </div>
+    <div class="ci rv">
+      <div class="meta">
+        <div><span class="k">harness</span> &nbsp;<b>30 scenarios</b></div>
+        <div><span class="k">chaos</span> &nbsp;&nbsp;&nbsp;<b>5 kill points · 100 process kills</b></div>
+        <div><span class="k">rail</span> &nbsp;&nbsp;&nbsp;&nbsp;<b>mock rail · v0.1</b></div>
+        <div><span class="k">writer</span> &nbsp;&nbsp;<b>CI, never by hand</b></div>
+        <div><span class="k">source</span> &nbsp;&nbsp;<b>RESULTS.md</b></div>
+      </div>
+      <div class="report" aria-label="Benchmark report">
+        <div class="hd"><span>metric</span><span>RESULTS.md</span></div>
+        <div class="row"><span class="k">duplicates per 1,000<small>under 30% rail ambiguity · direct vs gated</small></span>
+          <span class="v"><span class="tbd" data-result="duplicates_per_1000">TBD</span></span></div>
+        <div class="row"><span class="k">₹ at risk, blocked or held<small>before the rail was called · measured from the rail</small></span>
+          <span class="v"><span class="tbd" data-result="rupees_at_risk_prevented">TBD</span></span></div>
+        <div class="row"><span class="k">exactly-once violations<small>across 100 process kills · 5 kill points</small></span>
+          <span class="v"><span class="tbd" data-result="exactly_once_violations">TBD</span></span></div>
+        <div class="row"><span class="k">added latency p50 / p99<small>per decision · milliseconds</small></span>
+          <span class="v"><span class="tbd" data-result="latency_p50">TBD</span><span style="color:var(--dim)">/</span><span class="tbd" data-result="latency_p99">TBD</span></span></div>
+        <div class="ft"><span>status: <b>awaiting pipeline output</b></span><span>populated directly from RESULTS.md · never typed in</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ chapter 06 — adoption ═══════════════ -->
+<section class="chapter" id="adopt" aria-labelledby="h-adopt">
+  <div class="wrap">
+    <div class="adopt-head">
+      <div class="rv" style="max-width:52ch">
+        <p class="eyebrow ch-num">chapter 06 · adoption</p>
+        <h2 class="h2" id="h-adopt">One line in the agent's config changes.</h2>
+        <p class="lead">Interlock is an MCP server to the agent and an MCP client to the upstream. Drop-in control, not a platform migration.</p>
+      </div>
+      <!-- the handoff: the same boundary motif, as topology -->
+      <div class="handoff rv" role="img" aria-label="Your agent, unchanged, now points at the Interlock proxy on localhost port 8787. The proxy speaks the same MCP protocol to your existing MCP server. The line marked AI stops here sits between the agent and the proxy.">
+        <div class="ho-node"><b>your agent</b><span>unchanged</span></div>
+        <div class="ho-link"></div>
+        <div class="ho-cut"><b>ai stops here</b></div>
+        <div class="ho-node on"><b>interlock proxy</b><span>localhost:8787/mcp</span></div>
+        <div class="ho-link"></div>
+        <div class="ho-node"><b>your existing mcp server</b><span>mcp.razorpay.com/mcp</span></div>
+      </div>
+    </div>
+    <div class="moves">
+      <div class="move rv">
+        <div class="n">01 · INIT</div>
+        <h3>Define the boundary</h3>
+        <p>Four questions. A model drafts the mandate. A human approves it.</p>
+        <div class="term">
+<pre><span class="p">$ npx interlock-mcp init</span>
+  reading manifest… <span class="c">41 tools</span>
+  <span class="q">what may this agent do?</span>
+  <span class="a">&gt; refund approved returns, up to
+    the value of the returned item</span>
+  <span class="ok">✓</span> mandates/support-agent.yaml
+  <span class="c">review it before use</span></pre>
+        </div>
+      </div>
+      <div class="move rv">
+        <div class="n">02 · CONNECT</div>
+        <h3>Put Interlock in front</h3>
+        <p>Same MCP protocol, one address. The agent's code does not change.</p>
+        <div class="term">
+<pre><span class="c"># agent config — one line changes, no code does</span>
+<span class="del">"command": "docker", "args": ["run","-i","--rm","razorpay/mcp"]</span>
+<span class="add">"command": "npx", "args": ["-y","interlock-mcp","--mandate","./mandate.yaml"]</span>
+
+<span class="c"># or put it in front of your own MCP server</span>
+<span class="p">$ npx interlock-mcp</span>     --mandate ./mandates/support.yaml     --upstream-command <span class="c">"docker run -i --rm razorpay/mcp"</span></pre>
+        </div>
+      </div>
+      <div class="move rv">
+        <div class="n">03 · RUN</div>
+        <h3>Every proposal crosses it</h3>
+        <p>Nothing reaches the rail without a decision and a durable intent behind it.</p>
+        <ol class="trace" aria-label="Runtime path">
+          <li class="tr"><div class="v small">ai agent</div><div class="m">proposes a tool call</div></li>
+          <li class="cutline"><b>ai stops here</b></li>
+          <li class="tr done"><div class="v small">interlock</div><div class="m">mandate · six gates · exactly-once</div></li>
+          <li class="tr done"><div class="v small">decision</div><div class="m">allow · hold · block, with evidence</div></li>
+          <li class="tr done"><div class="v small">rail</div><div class="m">called at most once, then verified</div></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ chapter 07 — the envelope ═══════════════ -->
+<section class="chapter" id="envelope" aria-labelledby="h-env">
+  <div class="wrap">
+    <div class="rv" style="max-width:52ch">
+      <p class="eyebrow ch-num">chapter 07 · the envelope</p>
+      <h2 class="h2" id="h-env">Interlock is deliberately small.</h2>
+      <p class="lead">Naming the envelope precisely is the production signal. An unqualified claim is the demo signal.</p>
+    </div>
+    <div class="env">
+      <div class="rv">
+        <h3 class="is">it is</h3>
+        <ul>
+          <li><i>+</i><span>Deterministic money controls<small>Six gates, in order, with the evidence each one resolved.</small></span></li>
+          <li><i>+</i><span>Semantic idempotency<small>One key per semantic action, durable before the rail is called.</small></span></li>
+          <li><i>+</i><span>Mandate-bound execution<small>Tools the mandate does not grant are never listed to the agent.</small></span></li>
+          <li><i>+</i><span>Reconciliation<small>Unknown outcomes are resolved against the rail, or handed to a human.</small></span></li>
+          <li><i>+</i><span>An auditable record<small>Every proposal, verdict and the evidence each gate resolved, in a gapless hash-chained ledger.</small></span></li>
+        </ul>
+      </div>
+      <div class="rv">
+        <h3 class="not">it is not</h3>
+        <ul>
+          <li><i>−</i><span>An LLM deciding payments<small>The model writes the policy. It never enforces it.</small></span></li>
+          <li><i>−</i><span>A replacement for the payment rail<small>It sits in front of the rail's own MCP server.</small></span></li>
+          <li><i>−</i><span>A universal fraud engine<small>It enforces a mandate. It does not detect intent it was not told about.</small></span></li>
+          <li><i>−</i><span>A multi-tenant enterprise platform<small>Single-tenant, single-process, SQLite.</small></span></li>
+          <li><i>−</i><span>Magic AI safety<small>A control layer with a documented envelope, not a guarantee against every payment failure.</small></span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="envelope rv">
+      <p class="eyebrow">stated, not assumed</p>
+      <p><b>Single-tenant. Single-process. SQLite, no HA.</b> The operator console is not in v0.1. Validated against a high-fidelity <b>mock rail</b> only &mdash; the live Razorpay adapter is not in v0.1, and <code>--rail razorpay</code> refuses rather than pretending. Purpose-checking is opt-in, advisory and not implemented. The benchmark&rsquo;s headline delta comes from our own scripted harness, labelled as such in every table.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ the invitation ═══════════════ -->
+<section class="final" aria-labelledby="h-cta">
+  <div class="wrap">
+    <div class="final-grid rv">
+      <div>
+      <h2 class="big" id="h-cta">The agent can propose. <em>The rail should not have to trust it.</em></h2>
+      <p class="sub">Put a deterministic boundary around your agent.
+        <small>See what the agent proposed. See what Interlock allowed. See what reached the rail.</small></p>
+      <div class="actions">
+        <div class="cmd" role="group" aria-label="Install command">
+          <span class="p">$</span><span>npx interlock-mcp</span>
+          <button type="button" data-copy="npx interlock-mcp" aria-label="Copy install command">copy</button>
+        </div>
+        <a class="btn primary" data-link="npm" href="#">Get it on npm <span class="arr">→</span></a>
+        <a class="btn ghost" data-link="github" href="#">View source <span class="arr">↗</span></a>
+      </div>
+      </div>
+
+      <div class="final-side">
+        <div class="stage stage-cta" data-slot="cta" role="img" aria-label="A permitted ₹2,800 refund passes the mandate and the deterministic gates, passing beneath the optional model gate which is not in the path, writes a durable intent, reaches the payment rail once, is read back from the ledger, and is verified as applied.">
+          <div class="xr" aria-hidden="true"><div class="xr-labels" data-labels></div></div>
+        </div>
+        <ol class="trace" aria-label="A permitted action, end to end">
+          <li class="tr" data-q="0"><div class="k">agent</div><div class="v small">create_refund · ₹2,800</div></li>
+          <li class="cutline" data-q=".22"><b>ai stops here</b></li>
+          <li class="tr done" data-q=".3"><div class="k">mandate · six gates</div><div class="v small">allowed, with evidence</div></li>
+          <li class="tr done" data-q=".74"><div class="k">intent</div><div class="v small">written and fsynced first</div></li>
+          <li class="tr done" data-q=".86"><div class="k">rail</div><div class="v small">called once</div></li>
+          <li class="tr ok" data-q=".95"><div class="k">outcome</div><div class="v small v-allow">APPLIED · verified</div></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <a class="mark" href="#top">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1.5" y="1.5" width="8" height="8" stroke="currentColor" stroke-width="1.2"/><rect x="6.5" y="6.5" width="8" height="8" stroke="currentColor" stroke-width="1.2"/></svg>
+        Interlock
+      </a>
+      <a data-link="github" href="#">GitHub</a>
+      <a data-link="npm" href="#">npm</a>
+      <a data-link="console" href="#">Console</a>
+      <a href="#disclosure">Responsible disclosure</a>
+      <span class="note">public demo runs against a mock rail</span>
+    </div>
+    <p class="disclosure" id="disclosure">Found a way past a gate? Report it privately through the repository's security policy before publishing. Interlock is a control layer under active development, and a reproducible bypass is the most useful thing you can send.</p>
+  </div>
+</footer>
+<!-- one WebGL canvas for the whole page; each x-ray slot is rendered into its own on-screen rectangle -->
+<canvas id="gl" aria-hidden="true"></canvas>
+<script>
+"use strict";
+/* ── destinations. Set these before shipping; nothing here is a claim. ── */
+const LINKS = {
+  /* No console entry: it is not in v0.1, and a link to a page that does not
+     exist is a claim that it does. Anything without a real URL here is left
+     aria-disabled by the loop below rather than pointing at nothing. */
+  github:  'https://github.com/Mustaqeem-Rafi/interlock',
+  npm:     'https://www.npmjs.com/package/interlock-mcp'
+};
+document.querySelectorAll('[data-link]').forEach(a => {
+  const href = LINKS[a.dataset.link];
+  if (href && href !== '#'){ a.href = href; if (/^https?:/.test(href)){ a.target = '_blank'; a.rel = 'noopener'; } }
+  else a.setAttribute('aria-disabled', 'true');
+});
+
+/* ── copy the install line ── */
+document.querySelectorAll('[data-copy]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(btn.dataset.copy); btn.textContent = 'copied'; btn.dataset.done = '1'; }
+    catch (e){ btn.textContent = 'select'; }
+    setTimeout(() => { btn.textContent = 'copy'; btn.dataset.done = '0'; }, 1600);
+  });
+});
+
+/* ── header rule appears once the page moves ── */
+const hdr = document.getElementById('top');
+const onScroll = () => hdr.classList.toggle('scrolled', window.scrollY > 8);
+onScroll(); window.addEventListener('scroll', onScroll, { passive:true });
+
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ── reveals ── */
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    const el = e.target;
+    if (el.classList.contains('machine')){
+      el.querySelectorAll('.gate').forEach((g, i) => setTimeout(() => g.classList.add('in'), reduced ? 0 : i * 120));
+    } else if (el.id === 'states'){
+      if (document.documentElement.classList.contains('motion')) return;   // under .motion the scroll drives the states; stay observed in case the x-ray gives up
+      replay(el);
+    } else el.classList.add('in');
+    io.unobserve(el);
+  });
+}, { rootMargin:'0px 0px -12% 0px', threshold:0.08 });
+document.querySelectorAll('.rv, .machine, #states').forEach(el => io.observe(el));
+
+/* ── act II replay: the pause after UNKNOWN is the point ── */
+function replay(list){
+  const rows = Array.from(list.children);
+  const ticks = list.querySelectorAll('.ticks i');
+  if (reduced){ rows.forEach(r => r.classList.add('on')); ticks.forEach(t => t.classList.add('on')); return; }
+  let t = 300;
+  rows.forEach(r => {
+    setTimeout(() => r.classList.add('on'), t);
+    if (r.classList.contains('brk')) t += 1100;                    // the death
+    else if (r.classList.contains('unsure')) t += 1400;            // hold on UNKNOWN
+    else if (r.classList.contains('big')) t += 1200;               // the statement
+    else t += 620;
+    if (r.querySelector('.ticks')){
+      ticks.forEach((tick, i) => setTimeout(() => tick.classList.add('on'), t + i * 280));
+      t += ticks.length * 280 + 400;
+    }
+  });
+}
+/* if the x-ray module gives up after the states were already observed, the timed replay takes over */
+window.__interlockReplay = () => { const l = document.getElementById('states'); if (l && !l.querySelector('.st.on')) replay(l); };
+
+/* ── the hero trace: one proposal, stopped at gate 02, rail never called ──
+   Runs only when the 2D trace is what the page shows; the x-ray module calls it if WebGL gives up. */
+let traceStarted = false;
+window.__interlockTrace = function trace(){
+  if (traceStarted) return; traceStarted = true;
+  const svg = document.querySelector('.trace-svg'); if (!svg) return;
+  const sig = svg.querySelector('#sig'), stop = svg.querySelector('#stopmark');
+  const pips = svg.querySelectorAll('#pips rect');
+  const FROM = 150, TO = 640;
+  const land = () => { sig.setAttribute('cx', TO); sig.setAttribute('opacity', 1); sig.classList.add('stop'); stop.setAttribute('opacity', 1); };
+  if (reduced){ land(); return; }
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  const run = () => {
+    const t0 = performance.now(), ms = 1700;
+    sig.setAttribute('opacity', 1);
+    const step = now => {
+      const k = Math.min(1, (now - t0) / ms);
+      sig.setAttribute('cx', FROM + (TO - FROM) * ease(k));
+      if (k < 1) requestAnimationFrame(step);
+      else {
+        sig.classList.add('stop');
+        pips[0].classList.remove('dimmed');
+        setTimeout(() => { pips[1].classList.remove('dimmed'); stop.setAttribute('opacity', 1); sig.classList.add('beat'); }, 260);
+      }
+    };
+    requestAnimationFrame(step);
+  };
+  pips.forEach((p, i) => { if (i < 2) p.classList.add('dimmed'); });
+  setTimeout(run, 1600);
+};
+if (!document.documentElement.classList.contains('gl')) window.__interlockTrace();
+
+/* ── RESULTS.md → the report. fillResults({...}) when the pipeline has written it. ── */
+window.fillResults = function(values){
+  Object.keys(values || {}).forEach(k => {
+    const el = document.querySelector(`[data-result="${k}"]`);
+    if (!el) return;
+    el.textContent = values[k];
+    el.classList.remove('tbd');
+  });
+  const ft = document.querySelector('.report .ft b');
+  if (ft) ft.textContent = 'populated from RESULTS.md';
+};
+</script>
+<!-- gl:js:start -->
+<script type="module">
+/* ═══════════════════ the x-ray ═══════════════════
+   One WebGL renderer, one animation loop, one canvas. Scroll position is the only clock.
+   InterlockScene        renderer, the two scenes, per-slot cameras, the frame loop
+   Stack                 the control path as geometry: agent → proxy membrane → mandate → gates 01–06 → intent → egress → rail
+   Durability            act II, built from the same parts: a record on disk, a process that dies, a process that restarts
+   Labels                real type, projected from world anchors into each slot every frame
+   ScrollController      maps the page's scroll into a progress value per slot, then into a pose
+   InteractionController pointer parallax, hover on the stack, visibility
+   Nothing here is required: html.gl / html.motion are removed if Three.js cannot load, and the 2D page returns. */
+"use strict";
+(async function xray(){
+  const root = document.documentElement;
+  if (!root.classList.contains('gl')) return;
+  let degraded = false;
+  const degrade = () => {
+    if (degraded) return; degraded = true;
+    root.classList.remove('gl', 'motion', 'ready');
+    const here = document.elementFromPoint(24, 100); const sec = here && here.closest('section');
+    if (window.__interlockTrace) window.__interlockTrace();
+    if (window.__interlockReplay) window.__interlockReplay();
+    if (sec && scrollY > 200) sec.scrollIntoView();
+  };
+  let THREE;
+  try {
+    THREE = await Promise.race([
+      import('https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js'),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('cdn timeout')), 8000)),
+    ]);
+  } catch (e) { degrade(); return; }
+
+  /* ── constants ── */
+  const C = { bg:0x0c0e11, surface:0x14171c, raised:0x1b1f26, border:0x262b33, text:0xe6e9ee, muted:0x8b94a3, dim:0x5d6675, allow:0x3fb950, hold:0xd29922, block:0xf85149 };
+  const X = { agent:-7.4, proxy:-3.6, mandate:-2.0, gates:[0, 1, 2, 3, 4, 5], intent:6.6, egress:7.4, rail:8.6 };
+  const Y_FLOOR = -.8;                      /* top of the substrate */
+  const STOP_X = .78;                       /* the packet's nose at .93; gate 02's front face is at .96 */
+  const GATE_NAMES = ['01 · scope', '02 · value', '03 · limits', '04 · exactly once', '05 · purpose · model · off by default', '06 · provenance'];
+  const gateW = i => 1.8 * (1 - .04 * i), gateH = i => 1.5 * (1 - .04 * i);   /* apertures only ever narrow */
+  const G5_LIFT = .78;                      /* gate 05 sits clear of the path: the packet passes beneath it */
+  const motion = root.classList.contains('motion');
+  const finePointer = matchMedia('(pointer: fine)').matches;
+  const coarse = matchMedia('(pointer: coarse)').matches || matchMedia('(max-width: 860px)').matches;
+  const lowPower = (navigator.hardwareConcurrency || 8) <= 4;
+
+  /* ── small maths ── */
+  const clamp = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smooth = t => { t = clamp(t); return t * t * (3 - 2 * t); };
+  const range = (p, a, b) => clamp((p - a) / (b - a));
+  const damp = (cur, tgt, rate, dt) => cur + (tgt - cur) * (1 - Math.exp(-rate * dt));
+  const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+  const col = h => new THREE.Color(h);
+  const COL = { text: col(C.text), muted: col(C.muted), dim: col(C.dim), border: col(C.border), hold: col(C.hold), block: col(C.block), allow: col(C.allow), raised: col(C.raised), surface: col(C.surface), bg: col(C.bg) };
+
+  /* keyframes: [p, partial] pairs; each key carries the previous values forward.
+     Continuous channels (camera, packet, fov, fog) interpolate linearly — the damping supplies the ease.
+     Everything else uses smoothstep so on/off channels arrive cleanly. */
+  const LINEAR = new Set(['cam', 'tgt', 'fov', 'fog', 'packetX']);
+  function keyframes(list){ const keys = []; let cur = {}; for (const [p, part] of list){ cur = Object.assign({}, cur, part); keys.push({ p, v: cur }); } return keys; }
+  function sampleKeys(keys, p){
+    if (p <= keys[0].p) return Object.assign({}, keys[0].v);
+    for (let i = 0; i < keys.length - 1; i++){
+      const a = keys[i], b = keys[i + 1];
+      if (p <= b.p){
+        const u = (p - a.p) / (b.p - a.p), s = smooth(u), out = {};
+        for (const k in b.v){
+          const va = a.v[k], vb = b.v[k], t = LINEAR.has(k) ? u : s;
+          if (Array.isArray(vb)) out[k] = vb.map((n, j) => lerp(va[j], n, t));
+          else if (typeof vb === 'number') out[k] = lerp(va, vb, t);
+          else out[k] = t < .5 ? va : vb;
+        }
+        return out;
+      }
+    }
+    return Object.assign({}, keys[keys.length - 1].v);
+  }
+  function dampPose(cur, tgt, dt, rates){
+    for (const k in tgt){
+      const r = (rates && rates[k]) || 6;
+      if (Array.isArray(tgt[k])){ if (!cur[k]) cur[k] = tgt[k].slice(); for (let j = 0; j < tgt[k].length; j++) cur[k][j] = damp(cur[k][j], tgt[k][j], r, dt); }
+      else if (typeof tgt[k] === 'number') cur[k] = cur[k] === undefined ? tgt[k] : damp(cur[k], tgt[k], r, dt);
+      else cur[k] = tgt[k];
+    }
+    return cur;
+  }
+  const settled = (cur, tgt) => { for (const k in tgt){ if (Array.isArray(tgt[k])){ for (let j = 0; j < tgt[k].length; j++) if (Math.abs(cur[k][j] - tgt[k][j]) > 5e-4) return false; } else if (typeof tgt[k] === 'number' && Math.abs(cur[k] - tgt[k]) > 5e-4) return false; } return true; };
+
+  /* ── materials: flat fills at the page's own tokens, hairline edges as a rim, no speculars ── */
+  const mat = {
+    fill: (color = C.raised, opacity = 1) => new THREE.MeshLambertMaterial({ color, transparent: true, opacity }),
+    edge: (color = C.muted, opacity = .6) => new THREE.LineBasicMaterial({ color, transparent: true, opacity }),
+    dashedLine: (color = C.dim, opacity = .7) => new THREE.LineDashedMaterial({ color, dashSize: .08, gapSize: .06, transparent: true, opacity }),
+    plane: (color, opacity) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide }),
+    solid: (color, opacity = 1) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity }),
+  };
+
+  /* ── geometry helpers ── */
+  /* a rectangular frame (ring) standing in the YZ plane, `depth` along X — the layer a request must pass through */
+  function frameGeo(w, h, bar, depth){
+    const s = new THREE.Shape(); s.moveTo(-w / 2, -h / 2); s.lineTo(w / 2, -h / 2); s.lineTo(w / 2, h / 2); s.lineTo(-w / 2, h / 2); s.closePath();
+    const iw = w / 2 - bar, ih = h / 2 - bar, hole = new THREE.Path(); hole.moveTo(-iw, -ih); hole.lineTo(iw, -ih); hole.lineTo(iw, ih); hole.lineTo(-iw, ih); hole.closePath();
+    s.holes.push(hole);
+    const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false });
+    g.rotateY(Math.PI / 2); g.translate(-depth / 2, 0, 0);
+    return g;
+  }
+  const planeYZ = (w, h) => { const g = new THREE.PlaneGeometry(w, h); g.rotateY(Math.PI / 2); return g; };
+  const lineGeo = pts => new THREE.BufferGeometry().setFromPoints(pts);
+  const edges = (geo, material) => new THREE.LineSegments(new THREE.EdgesGeometry(geo, 20), material);
+  const UNIT = new THREE.BoxGeometry(1, 1, 1);
+  const bar = (mtl, sx, sy, sz) => { const m = new THREE.Mesh(UNIT, mtl); m.scale.set(sx, sy, sz); return m; };
+  /* dashes as geometry, so a dashed rule has thickness at any pixel ratio. Rect in the YZ plane, or a run along Z. */
+  function dashRect(w, h, material, dash = .12, gap = .08, thick = .028){
+    const segs = [[V3(0, -h / 2, -w / 2), V3(0, -h / 2, w / 2)], [V3(0, h / 2, -w / 2), V3(0, h / 2, w / 2)], [V3(0, -h / 2, -w / 2), V3(0, h / 2, -w / 2)], [V3(0, -h / 2, w / 2), V3(0, h / 2, w / 2)]];
+    return dashRun(segs, material, dash, gap, thick);
+  }
+  function dashRun(segs, material, dash = .12, gap = .08, thick = .028){
+    const items = [];
+    for (const [a, b] of segs){ const d = b.clone().sub(a), L = d.length(), dir = d.normalize(); for (let s = 0; s + dash * .5 < L; s += dash + gap){ const len = Math.min(dash, L - s); items.push({ p: a.clone().addScaledVector(dir, s + len / 2), dir, len }); } }
+    const im = new THREE.InstancedMesh(UNIT, material, items.length); const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = V3(1, 0, 0);
+    items.forEach((it, i) => { q.setFromUnitVectors(up, it.dir); sc.set(it.len, thick, thick); m4.compose(it.p, q, sc); im.setMatrixAt(i, m4); });
+    im.instanceMatrix.needsUpdate = true; return im;
+  }
+  /* a drawn line: draws from its start (out 0→1) and retracts from its start (back 0→1) */
+  function drawnLine(points, material, samples = 80){
+    const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0);
+    const pts = curve.getPoints(samples); const g = lineGeo(pts); const line = new THREE.Line(g, material); if (material.isLineDashedMaterial) line.computeLineDistances();
+    line.userData.n = pts.length; line.set = (out, back) => { const n = line.userData.n; const end = Math.round(out * n), start = Math.round(back * n); g.setDrawRange(Math.min(start, end), Math.max(0, end - start)); line.visible = end - start > 1; }; line.set(0, 0); return line;
+  }
+
+  /* a layer: a body + its edges, with one activation value 0…1 that sets brightness */
+  class Layer {
+    constructor(x, geo, opts = {}){
+      this.group = new THREE.Group(); this.group.position.x = x;
+      this.dormant = opts.dormant ?? .32; this.act = -1;
+      this.edgeLow = opts.edgeLow || COL.dim; this.edgeHigh = opts.edgeHigh || COL.text;
+      this.fillLow = opts.fillLow || COL.raised; this.fillHigh = opts.fillHigh || col(0x2b323c);
+      if (geo){
+        this.mat = mat.fill(C.raised, 1); this.mesh = new THREE.Mesh(geo, this.mat); this.group.add(this.mesh);
+        this.edgeMat = mat.edge(C.muted, .6); this.edges = edges(geo, this.edgeMat); this.group.add(this.edges);
+      }
+      this.set(this.dormant);
+    }
+    set(act){
+      if (Math.abs(act - this.act) < 1e-4) return; this.act = act;
+      if (this.mat){ this.mat.opacity = lerp(.55, 1, act); this.mat.color.lerpColors(this.fillLow, this.fillHigh, smooth(act)); }
+      if (this.edgeMat){ this.edgeMat.opacity = lerp(.22, .95, act); this.edgeMat.color.lerpColors(this.edgeLow, this.edgeHigh, smooth(act)); }
+    }
+  }
+
+  /* ═══ Stack — the control path ═══ */
+  class Stack {
+    constructor(){
+      const g = this.group = new THREE.Group();
+      /* the AI side has no ground and no frame. A point, and an unruled line toward the membrane. */
+      const agentDot = new THREE.Mesh(new THREE.SphereGeometry(.022, 12, 8), mat.solid(C.text, .9)); agentDot.position.x = X.agent; g.add(agentDot); this.agentDot = agentDot;
+      const tpts = []; for (let i = 0; i <= 48; i++){ const t = i / 48; tpts.push(V3(lerp(X.agent, X.proxy, t), .06 * Math.sin(t * Math.PI * 2) * (1 - t), .12 * Math.sin(t * Math.PI))); }
+      this.transportPts = tpts; this.transport = new THREE.Line(lineGeo(tpts), mat.edge(C.dim, .55)); g.add(this.transport);
+      /* the upstream side is MCP too: from the egress to the rail, the same unruled line */
+      const upts = []; for (let i = 0; i <= 16; i++){ const t = i / 16; upts.push(V3(lerp(X.egress, X.rail, t), .04 * Math.sin(t * Math.PI), .06 * Math.sin(t * Math.PI))); }
+      this.upstream = new THREE.Line(lineGeo(upts), mat.edge(C.dim, .55)); g.add(this.upstream);
+      /* the substrate: only the deterministic side has ground. A dark slab from the membrane to the egress. */
+      const subLen = X.egress - X.proxy, subGeo = new THREE.BoxGeometry(subLen, .06, 3.2);
+      this.substrate = new THREE.Mesh(subGeo, mat.fill(C.surface, 1)); this.substrate.position.set(X.proxy + subLen / 2, Y_FLOOR - .03, 0); g.add(this.substrate);
+      this.substrateEdge = edges(subGeo, mat.edge(C.border, .9)); this.substrateEdge.position.copy(this.substrate.position); g.add(this.substrateEdge);
+      const gpts = []; for (let z = -1.6; z <= 1.6001; z += .4) gpts.push(V3(X.proxy, Y_FLOOR + .004, z), V3(X.egress, Y_FLOOR + .004, z));
+      for (let x = X.proxy; x <= X.egress + .001; x += .4) gpts.push(V3(x, Y_FLOOR + .004, -1.6), V3(x, Y_FLOOR + .004, 1.6));
+      this.grid = new THREE.LineSegments(lineGeo(gpts), mat.edge(C.muted, .07)); this.grid.material.depthWrite = false; this.grid.renderOrder = -1; g.add(this.grid);
+      /* the ruled axis, with ticks every half unit; after gate 02 it can go dashed — the path that was never taken */
+      this.axisA = new THREE.Line(lineGeo([V3(X.proxy, 0, 0), V3(1, 0, 0)]), mat.edge(C.dim, .8)); g.add(this.axisA);
+      this.axisB = new THREE.Line(lineGeo([V3(1, 0, 0), V3(X.egress, 0, 0)]), mat.edge(C.dim, .8)); g.add(this.axisB);
+      this.axisAfter = new THREE.Line(lineGeo([V3(1, 0, 0), V3(X.egress, 0, 0)]), mat.dashedLine(C.dim, 0)); this.axisAfter.computeLineDistances(); g.add(this.axisAfter);
+      const tpts2 = []; for (let x = -3.5; x <= X.egress + .001; x += .5) tpts2.push(V3(x, -.045, 0), V3(x, .045, 0));
+      this.ticks = new THREE.LineSegments(lineGeo(tpts2), mat.edge(C.dim, .5)); g.add(this.ticks);
+      /* the proxy membrane: a thin lamina, edged in the page's amber dashes, continued as a cut across the substrate */
+      const proxy = this.proxy = new Layer(X.proxy, null);
+      this.membraneMat = mat.plane(C.muted, .06); const membrane = new THREE.Mesh(new THREE.BoxGeometry(.05, 2.8, 3.6), this.membraneMat); membrane.renderOrder = 1; membrane.position.x = -.01;
+      this.membraneDash = dashRect(3.6, 2.8, mat.solid(C.hold, .95));
+      const cut = dashRun([[V3(0, Y_FLOOR + .01, -1.6), V3(0, Y_FLOOR + .01, 1.6)]], mat.solid(C.hold, .7), .1, .08, .02);
+      proxy.group.add(membrane, this.membraneDash, cut); g.add(proxy.group);
+      /* the egress: where Interlock ends and the upstream MCP server begins. A thin neutral rule. */
+      this.egress = new THREE.Line(lineGeo([V3(X.egress, Y_FLOOR, 0), V3(X.egress, .9, 0)]), mat.edge(C.muted, .7)); g.add(this.egress);
+      /* mandate: a larger frame with a filled leaf — the approved document */
+      const mandGeo = frameGeo(2.1, 1.75, .06, .06);
+      const mandate = this.mandate = new Layer(X.mandate, mandGeo, { dormant: .35 });
+      this.mandateLeaf = new THREE.Mesh(planeYZ(1.98, 1.63), mat.plane(C.surface, .55)); mandate.group.add(this.mandateLeaf); g.add(mandate.group);
+      /* gates: frames whose apertures only narrow. 05 is the anomaly — dashed, amber, lifted clear of the path */
+      this.gates = X.gates.map((x, i) => {
+        if (i === 4){
+          const L = new Layer(x, null, { dormant: .5 });
+          const dash = dashRect(gateW(i), gateH(i), mat.solid(C.hold, .9), .1, .07, .024); L.dashMat = dash.material;
+          L.group.add(dash); L.group.position.y = G5_LIFT;
+          L.set = function(act){ if (Math.abs(act - this.act) < 1e-4) return; this.act = act; this.dashMat.opacity = lerp(.5, 1, act); };
+          L.set(.5); L.model = true; g.add(L.group); return L;
+        }
+        const L = new Layer(x, frameGeo(gateW(i), gateH(i), .07, .08));
+        const tick = bar(mat.solid(C.muted, 0), .015, .03, .18); tick.position.y = gateH(i) / 2 + .05; L.tick = tick; L.group.add(tick);
+        g.add(L.group); return L;
+      });
+      /* gate 02 is a comparator: two measures in true proportion, a gauge line, and a shutter that can close */
+      const g2 = this.gates[1], innerW = gateW(1) - .14, innerH = gateH(1) - .14;
+      this.shutter = new THREE.Mesh(planeYZ(innerW - .02, innerH - .02), mat.plane(C.block, 0)); this.shutter.position.x = .02; this.shutter.renderOrder = 2; this.shutter.material.fog = false; g2.group.add(this.shutter);
+      this.gauge = new THREE.Line(lineGeo([V3(0, -.08, -.75), V3(0, .44, -.75)]), mat.edge(C.dim, 0)); g2.group.add(this.gauge);
+      this.barA = bar(mat.solid(C.muted, 0), .02, .025, 1); this.barA.position.set(0, .3, -.75); g2.group.add(this.barA);   /* order_amount_minor 4800000 */
+      this.barB = bar(mat.solid(C.text, 0), .02, .025, 1); this.barB.position.set(0, .05, -.75); g2.group.add(this.barB);    /* claimed_line_item_minor 189900 */
+      this.barALen = 1.5; this.barBLen = 1.5 * 189900 / 4800000;
+      this.endstop = bar(mat.solid(C.block, 0), .02, .1, .1); this.endstop.position.set(.95, 0, 0); this.endstop.material.fog = false; g.add(this.endstop);
+      /* the read-only resolve: leaves gate 02, touches the rail's flank, and comes back. Never the terminal. */
+      this.probe = drawnLine([V3(1, .72, 0), V3(1.15, .9, .55), V3(X.rail - .8, .95, 1.0), V3(X.rail, .55, 1.05)], mat.dashedLine(C.muted, .8)); g.add(this.probe);
+      this.probe.material.fog = false;
+      /* the verification read-back: from the rail's flank back to the intent */
+      this.verify = drawnLine([V3(X.rail, .55, 1.05), V3(X.rail - .5, .95, 1.0), V3(X.intent + .3, .9, .7), V3(X.intent, .32, .46)], mat.dashedLine(C.muted, .8)); g.add(this.verify);
+      /* hit planes for hover — never drawn */
+      this.hits = X.gates.map((x, i) => { const m = new THREE.Mesh(planeYZ(1.9, 1.6), new THREE.MeshBasicMaterial({ visible: false })); m.position.set(x, i === 4 ? G5_LIFT : 0, 0); m.userData.gate = i; g.add(m); return m; });
+      /* intent: a block rooted in the substrate — the durable object. rail: a terminal frame on two long bars, on no ground of ours */
+      const intentGeo = new THREE.BoxGeometry(.44, 1.1, .9);
+      const intent = this.intent = new Layer(X.intent, intentGeo, { dormant: .2 }); intent.group.position.y = -.25; g.add(intent.group);
+      const rail = this.rail = new Layer(X.rail, frameGeo(2.4, 1.0, .06, .07), { dormant: .2 });
+      const railBarGeo = new THREE.BoxGeometry(.05, .05, 3.6);
+      const b1 = new THREE.Mesh(railBarGeo, rail.mat), b2 = new THREE.Mesh(railBarGeo, rail.mat); b1.position.y = .5; b2.position.y = -.5;
+      rail.group.add(b1, b2); this.railOkEdge = edges(frameGeo(2.4, 1.0, .06, .07), mat.edge(C.allow, 0)); rail.group.add(this.railOkEdge); g.add(rail.group);
+      /* the request: one packet. Unresolved (a ghost around it) on the AI side, parsed (an outline) past the membrane. Neutral to the end. */
+      this.packetMat = mat.solid(C.text, 1); this.packetMat.fog = false;
+      this.packet = new THREE.Mesh(new THREE.BoxGeometry(.3, .06, .06), this.packetMat); g.add(this.packet);
+      this.ghostMat = mat.solid(C.text, .12); this.ghost = new THREE.Mesh(new THREE.BoxGeometry(.48, .1, .1), this.ghostMat); this.ghost.material.depthWrite = false; g.add(this.ghost);
+      this.outlineMat = mat.edge(C.muted, 0); this.outline = edges(new THREE.BoxGeometry(.42, .14, .14), this.outlineMat); g.add(this.outline);
+      this.layers = { proxy, mandate, intent, rail };
+    }
+    /* where the packet sits for a given x: on the unruled line before the membrane, on the ruled axis after it */
+    packetPos(x, out){
+      out.set(x, 0, 0);
+      if (x < X.proxy){ const t = (x - X.agent) / (X.proxy - X.agent); out.y = .06 * Math.sin(t * Math.PI * 2) * (1 - t); out.z = .12 * Math.sin(t * Math.PI); }
+      else if (x > X.egress){ const t = (x - X.egress) / (X.rail - X.egress); out.y = .04 * Math.sin(t * Math.PI); out.z = .06 * Math.sin(t * Math.PI); }
+      return out;
+    }
+    apply(p){
+      this.agentDot.material.opacity = lerp(.35, .9, p.aAgent);
+      this.membraneMat.opacity = lerp(.06, .18, p.glow);
+      this.membraneDash.material.opacity = lerp(.55, 1, p.aProxy);
+      this.mandate.set(p.aMandate); this.mandateLeaf.material.opacity = lerp(.25, .6, p.aMandate);
+      for (let i = 0; i < 6; i++){ const L = this.gates[i]; L.set(p.aG[i]); if (L.tick) L.tick.material.opacity = p.tick[i]; }
+      const g2 = this.gates[1];
+      this.shutter.material.opacity = p.shutter * .16;
+      if (p.shutter > .02){ g2.edgeMat.color.lerpColors(COL.text, COL.block, smooth(p.shutter)); g2.edgeMat.opacity = 1; }
+      this.endstop.material.opacity = p.shutter * .95;
+      this.axisAfter.material.opacity = p.shutter * .4; this.axisB.material.opacity = .8 * (1 - p.shutter);
+      this.gauge.material.opacity = Math.max(p.barA, p.barB) * .6;
+      this.barA.material.opacity = p.barA > .01 ? .9 : 0; this.barA.scale.z = Math.max(.001, this.barALen * p.barA); this.barA.position.z = -.75 + this.barA.scale.z / 2;
+      this.barB.material.opacity = p.barB > .01 ? 1 : 0; this.barB.scale.z = Math.max(.001, this.barBLen * p.barB); this.barB.position.z = -.75 + this.barB.scale.z / 2;
+      this.probe.set(p.probeOut, p.probeBack); this.verify.set(p.verifyOut, p.verifyBack);
+      this.intent.set(p.aIntent); this.rail.set(p.aRail); this.railOkEdge.material.opacity = p.railOk;
+      this.packet.visible = p.packetOn > .02; this.ghost.visible = this.packet.visible && p.ghost > .02; this.outline.visible = this.packet.visible && p.parsed > .02;
+      if (this.packet.visible){
+        this.packetPos(p.packetX, this.packet.position); this.packetMat.opacity = p.packetOn;
+        this.ghost.position.copy(this.packet.position); const gs = lerp(.6, 1, p.ghost); this.ghost.scale.set(gs, gs, gs); this.ghostMat.opacity = .12 * p.ghost * p.packetOn;
+        this.outline.position.copy(this.packet.position); this.outlineMat.opacity = .6 * p.parsed * p.packetOn;
+      }
+    }
+  }
+
+  /* ═══ Durability — act II from the same parts. The frame is the process; the block is the record; the floor is the disk ═══ */
+  class Durability {
+    constructor(){
+      const g = this.group = new THREE.Group();
+      const floorGeo = new THREE.BoxGeometry(4.4, .06, 2.8);
+      this.floor = new THREE.Mesh(floorGeo, mat.fill(C.surface, 1)); this.floor.position.set(-.1, -.03, 0);
+      this.floorEdge = edges(floorGeo, mat.edge(C.border, .9)); this.floorEdge.position.copy(this.floor.position); g.add(this.floor, this.floorEdge);
+      const gpts = []; for (let z = -1.2; z <= 1.2001; z += .4) gpts.push(V3(-2.3, .004, z), V3(2.1, .004, z)); for (let x = -2.3; x <= 2.1001; x += .4) gpts.push(V3(x, .004, -1.4), V3(x, .004, 1.4));
+      const grid = new THREE.LineSegments(lineGeo(gpts), mat.edge(C.muted, .07)); grid.material.depthWrite = false; grid.renderOrder = -1; g.add(grid);
+      /* the record: the intent block, resting on the disk */
+      const slabGeo = new THREE.BoxGeometry(.9, .5, .62);
+      this.slab = new Layer(-.55, slabGeo, { dormant: .15 }); this.slab.group.position.y = .25; g.add(this.slab.group);
+      /* the row: the same frame geometry, lying flat around the record. Inserted at PROPOSED, fenced at QUARANTINED. */
+      const rowGeo = frameGeo(1.5, 1.25, .05, .03); rowGeo.rotateZ(-Math.PI / 2);
+      this.rowMat = mat.edge(C.dim, 0); this.row = edges(rowGeo, this.rowMat); this.row.position.set(-.55, .015, 0); g.add(this.row);
+      /* the process: a gate-type frame standing on the disk in front of the record. It holds the request in memory; it holds no state. */
+      const procGeo = frameGeo(1.8, 1.5, .06, .06);
+      this.procMat = mat.edge(C.muted, .75); this.proc = edges(procGeo, this.procMat); this.proc.position.set(.05, .75, 0); g.add(this.proc);
+      this.procFillMat = mat.plane(C.muted, .03); const procFill = new THREE.Mesh(planeYZ(1.68, 1.38), this.procFillMat); procFill.position.copy(this.proc.position); g.add(procFill);
+      this.packetMat = mat.solid(C.text, 1); this.packet = new THREE.Mesh(new THREE.BoxGeometry(.3, .06, .06), this.packetMat); this.packetHome = V3(.05, 1.0, 0); this.packet.position.copy(this.packetHome); g.add(this.packet);
+      /* the rail, beyond the disk: a terminal frame on two bars */
+      const railGeo = frameGeo(1.4, .7, .05, .06);
+      this.rail = new Layer(2.9, railGeo, { dormant: .25 }); this.rail.group.position.y = .35;
+      const rb = new THREE.BoxGeometry(.04, .04, 2.2); const r1 = new THREE.Mesh(rb, this.rail.mat), r2 = new THREE.Mesh(rb, this.rail.mat); r1.position.y = .35; r2.position.y = -.35; this.rail.group.add(r1, r2); g.add(this.rail.group);
+      this.terminalMat = mat.edge(C.hold, 0); this.terminal = edges(railGeo, this.terminalMat); this.terminal.position.copy(this.rail.group.position); g.add(this.terminal);
+      /* lines: the write (fsync) down to the record, the call toward the rail, the read up from the disk at boot, six reconciliation passes */
+      this.write = drawnLine([this.packetHome.clone(), V3(-.4, .52, 0)], mat.edge(C.text, .8), 24); g.add(this.write);
+      this.callEnd = V3(2.9 - .7, .5, 0);
+      this.call = drawnLine([this.packetHome.clone(), V3(1.2, .95, 0), this.callEnd.clone()], mat.edge(C.text, .8), 60); g.add(this.call);
+      this.ghostCall = drawnLine([this.packetHome.clone(), V3(1.2, .95, 0), this.callEnd.clone()], mat.edge(C.dim, .12), 60); g.add(this.ghostCall);
+      this.read = drawnLine([V3(-.4, .5, 0), V3(-.2, .95, 0), V3(.05, 1.0, 0)], mat.dashedLine(C.muted, .8), 24); g.add(this.read);
+      this.probes = [];
+      for (let i = 0; i < 6; i++){ const l = drawnLine([V3(.05, 1.5 - i * .04, 0), V3(1.3, 1.62 - i * .05, -.4 - i * .12), V3(2.9, .72, -.95 - i * .06)], mat.dashedLine(C.muted, .85), 64); this.probes.push(l); g.add(l); }
+      /* the lease: a small bar on the record's top face */
+      this.leaseMat = mat.solid(C.muted, 0); this.lease = bar(this.leaseMat, .6, .02, .02); this.lease.position.set(-.55, .51, .36); g.add(this.lease);
+      this.leaseGhostMat = mat.edge(C.hold, 0); this.leaseGhost = edges(new THREE.BoxGeometry(.6, .02, .02), this.leaseGhostMat); this.leaseGhost.position.copy(this.lease.position); g.add(this.leaseGhost);
+      this.procFill = procFill;
+    }
+    apply(s){
+      this.slab.set(s.fill); this.slab.group.visible = s.slabOn > .02;
+      this.slab.edgeMat.color.copy(COL.text).lerp(COL.hold, 0); this.slab.edgeMat.opacity = lerp(.25, 1, s.slabOn) * (s.fsync > 0 ? 1 : 1);
+      this.rowMat.opacity = s.row * (s.quarantine > .01 ? 1 : .4); this.rowMat.color.lerpColors(COL.dim, COL.block, s.quarantine);
+      this.procMat.opacity = .75 * s.proc; this.procFillMat.opacity = .03 * s.proc; this.proc.visible = s.proc > .01; this.procFill.visible = this.proc.visible;
+      this.packetMat.opacity = s.packetOn; this.packet.visible = s.packetOn > .02;
+      if (this.packet.visible){ const a = this.packetHome, b = this.callEnd, t = s.packetT; this.packet.position.set(lerp(a.x, b.x, t), t < .5 ? lerp(a.y, .95, t * 2) : lerp(.95, b.y, (t - .5) * 2), 0); }
+      this.write.set(s.write, 0); this.write.material.opacity = .8 * s.writeOn;
+      this.call.set(s.call * .85, 0); this.call.material.opacity = .8 * s.callOn;
+      this.ghostCall.set(.85, 0); this.ghostCall.material.opacity = .12 * s.ghost;
+      this.read.set(s.read, 0);
+      for (let i = 0; i < 6; i++){ const t = clamp(s.probes - i); this.probes[i].set(Math.min(1, t / .6), Math.max(0, (t - .6) / .4)); }
+      this.leaseMat.opacity = s.leaseOn; this.lease.scale.x = Math.max(.001, .6 * s.lease); this.lease.position.x = -.55 - .3 * (1 - s.lease);
+      this.leaseGhostMat.opacity = s.leaseExpired * .9;
+      this.terminalMat.opacity = s.terminal; this.terminalMat.color.lerpColors(COL.muted, COL.hold, s.terminalHold);
+      this.rail.set(lerp(.25, .5, s.terminal));
+    }
+  }
+
+  /* ═══ Labels — DOM type, projected ═══ */
+  class Labels {
+    constructor(container, defs){
+      this.defs = defs; this.v = new THREE.Vector3();
+      for (const d of defs){ d.el = document.createElement('span'); d.el.className = 'lab ' + (d.cls || ''); d.el.innerHTML = d.html; container.appendChild(d.el); d.on = false; d.anchor = d.anchor || V3(); }
+    }
+    update(camera, w, h, show){
+      for (const d of this.defs){
+        const want = show.has(d.key);
+        this.v.copy(d.anchor).project(camera);
+        const inFront = this.v.z < 1 && this.v.z > -1;
+        const px = (this.v.x + 1) / 2 * w, py = (1 - this.v.y) / 2 * h;
+        const inside = px > -40 && px < w + 40 && py > -20 && py < h + 20;
+        const on = want && inFront && inside;
+        if (on){
+          const ax = d.align === 'c' ? '-50%' : d.align === 'r' ? '-100%' : '0';
+          const ay = d.valign === 'm' ? '-50%' : d.valign === 'b' ? '-100%' : '0';
+          d.el.style.transform = `translate3d(${Math.round(px + (d.dx || 0))}px,${Math.round(py + (d.dy || 0))}px,0) translate(${ax},${ay})`;
+        }
+        if (on !== d.on){ d.on = on; d.el.classList.toggle('on', on); }
+      }
+    }
+  }
+
+  /* ═══ InterlockScene ═══ */
+  const canvas = document.getElementById('gl');
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, alpha: true, powerPreference: 'high-performance' }); }
+  catch (e) { degrade(); return; }
+  canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); degrade(); }, false);
+  renderer.autoClear = false;
+  const dprCap = lowPower ? 1 : coarse ? 1.25 : 1.75;
+  let dpr = Math.min(window.devicePixelRatio || 1, dprCap); renderer.setPixelRatio(dpr);
+  const hemi = () => new THREE.HemisphereLight(0xe6e9ee, 0x0c0e11, 1.05);
+  const stackScene = new THREE.Scene(); stackScene.fog = new THREE.FogExp2(C.bg, .03); stackScene.add(new THREE.AmbientLight(0xffffff, .35), hemi());
+  const stack = new Stack(); stackScene.add(stack.group);
+  const killScene = new THREE.Scene(); killScene.fog = new THREE.FogExp2(C.bg, .02); killScene.add(new THREE.AmbientLight(0xffffff, .35), hemi());
+  const dur = new Durability(); killScene.add(dur.group);
+
+  /* ═══ InteractionController ═══ */
+  const IC = {
+    px: 0, py: 0, tx: 0, ty: 0, hover: -1, gain: 1,
+    init(){
+      if (finePointer && motion) addEventListener('pointermove', e => { this.tx = (e.clientX / innerWidth) * 2 - 1; this.ty = (e.clientY / innerHeight) * 2 - 1; wake(); }, { passive: true });
+      document.addEventListener('visibilitychange', wake);
+    },
+    step(dt){ this.px = damp(this.px, this.tx, 4, dt); this.py = damp(this.py, this.ty, 4, dt); }
+  };
+  IC.init();
+
+  /* ═══ slots ═══ */
+  const slots = [...document.querySelectorAll('.stage[data-slot]')].map(el => ({ el, kind: el.dataset.slot, visible: false, camera: new THREE.PerspectiveCamera(38, 1, .05, 80), pose: {}, rect: null, show: new Set(), labels: null, lastP: null }));
+  const io = new IntersectionObserver(es => { es.forEach(e => { const s = slots.find(s => s.el === e.target); if (s) s.visible = e.isIntersecting; }); wake(); }, { rootMargin: '10% 0px 10% 0px' });
+  slots.forEach(s => io.observe(s.el));
+  const byKind = k => slots.find(s => s.kind === k);
+
+  /* the whole mechanism, framed: distance follows the slot's aspect so the stack fits either way */
+  function revealCam(aspect, fov = 38){
+    const half = 9.3, t = Math.tan(fov / 2 * Math.PI / 180);
+    const d = aspect >= 1 ? half / (t * aspect) * 1.04 : half / t * 1.06;
+    const dir = V3(.05, .32, .95).normalize().multiplyScalar(Math.min(d, 70));
+    return [.6 + dir.x, -.1 + dir.y, dir.z];
+  }
+  const RIDE = { cam: [-1.2, .8, 1.7], tgt: [1.4, -.15, 0] };
+  const ride = px => ({ cam: [px + RIDE.cam[0], RIDE.cam[1], RIDE.cam[2]], tgt: [px + RIDE.tgt[0], RIDE.tgt[1], 0] });
+
+  /* ── hero: the incident, as a camera move along the path ── */
+  const BASE = { fov: 38, fog: .03, packetOn: 1, ghost: 1, parsed: 0, glow: 0, shutter: 0, barA: 0, barB: 0, probeOut: 0, probeBack: 0, verifyOut: 0, verifyBack: 0,
+                 aAgent: 1, aProxy: .55, aMandate: .35, aG: [.32, .32, .32, .32, .5, .32], tick: [0, 0, 0, 0, 0, 0], aIntent: .2, aRail: .2, railOk: 0 };
+  const heroKeys = keyframes([
+    [0.00, Object.assign({}, BASE, { cam: [-10.0, 1.0, 2.5], tgt: [-8.3, 0, 0], packetX: X.agent })],
+    [0.10, Object.assign({ packetX: -6.9 }, ride(-6.9))],
+    [0.19, Object.assign({ packetX: -3.7, aProxy: 1 }, ride(-3.7))],
+    [0.21, { glow: 1 }],
+    [0.23, Object.assign({ packetX: -3.35, glow: 0, ghost: 0, parsed: 1 }, ride(-3.35))],
+    [0.28, Object.assign({ packetX: -2.25, aMandate: 1, aAgent: .5 }, ride(-2.25))],
+    [0.34, Object.assign({ packetX: -.1, aG: [1, .32, .32, .32, .5, .32] }, ride(-.1))],
+    [0.355, { tick: [1, 0, 0, 0, 0, 0] }],
+    [0.40, Object.assign({ packetX: .45, aG: [1, .7, .32, .32, .5, .32] }, ride(.45))],
+    [0.47, { packetX: STOP_X, cam: [-1.2, 1.15, 2.7], tgt: [3.0, -.1, 0], fov: 36, aG: [1, 1, .32, .32, .5, .32] }],
+    [0.48, {}],
+    [0.52, { probeOut: 1 }],
+    [0.55, { probeBack: 1 }],
+    [0.59, {}],
+    [0.61, { barA: 1 }],
+    [0.63, {}],
+    [0.645, { barB: 1 }],
+    [0.68, {}],
+    [0.70, { shutter: 1 }],
+    [0.80, { cam: [-1.3, 1.2, 2.8], tgt: [3.0, -.1, 0] }],
+    [0.92, { cam: [0, 0, 0], tgt: [.6, -.1, 0], fov: 38, fog: .018, aAgent: .6, aProxy: .8, aMandate: .7, aG: [.7, 1, .32, .32, .5, .32] }],
+    [1.00, {}],
+  ]);
+  const heroCaps = [['proxy', .13, .27], ['stop', .70, .84], ['reveal', .92, 1.01]];
+  const heroIndex = [[0, 'ai agent'], [.10, 'mcp transport'], [.19, 'interlock proxy'], [.27, 'mandate'], [.33, 'gate 01 · scope'], [.41, 'gate 02 · value'], [.48, 'gate 02 · resolving'], [.59, 'gate 02 · evidence'], [.70, 'gate 02 · block'], [.84, 'the stack']];
+  const heroLabelDefs = () => [
+    { key: 'agent', html: 'ai agent · support-agent', anchor: V3(X.agent, -.3, 0), align: 'c', dy: 10 },
+    { key: 'pSans', cls: 'sans', html: 'create_refund for <b>₹48,000</b>', anchor: V3(), dy: -14, valign: 'b', align: 'c' },
+    { key: 'pMono', cls: 'evd hi', html: '<span class="k">create_refund · well-formed</span>amount_minor <b>4800000</b> · subject order_A8841', anchor: V3(), dy: -16, valign: 'b', align: 'c' },
+    { key: 'pBad', cls: 'evd', html: '<span class="k">proposed · no authority</span><b class="red">₹48,000</b> · create_refund', anchor: V3(), dy: -16, valign: 'b', align: 'c' },
+    { key: 'pBad2', cls: 'evd', html: '<span class="k">proposed · no authority</span><b class="red">₹48,000</b> · create_refund', anchor: V3(), dy: 18, align: 'c' },
+    { key: 'proxy', cls: 'hold', html: 'interlock proxy · ai stops here', anchor: V3(X.proxy, 1.42, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'det', html: 'deterministic execution begins', anchor: V3(X.proxy + .2, Y_FLOOR, 1.6), dy: 10 },
+    { key: 'mandate', cls: 'hi', html: 'mandate · yaml · approved by a human', anchor: V3(X.mandate, .875, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'g0', cls: 'hi', html: '01 · scope', anchor: V3(0, gateH(0) / 2, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'g0pass', cls: 'hi', html: '<i class="tick"></i>pass', anchor: V3(0, -gateH(0) / 2, 0), align: 'c', dy: 12 },
+    { key: 'g1', cls: 'hi', html: '02 · value', anchor: V3(1, gateH(1) / 2, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'probe', cls: 'evd hi', html: '<span class="k">read-only client</span>resolve <b>order_A8841</b> from the rail', anchor: V3(4.2, .95, 1.0), align: 'c', valign: 'b', dy: -8 },
+    { key: 'ev1', cls: 'evd', html: '<span class="k">resolved_order</span><b>order_A8841</b>', anchor: V3(1, gateH(1) / 2, .9), dx: 14, dy: -6, valign: 'b' },
+    { key: 'ev2', cls: 'evd', html: '<span class="k">order_amount_minor</span><b>4800000</b> → ₹48,000', anchor: V3(1, .3, .78), dx: 14, valign: 'm' },
+    { key: 'ev3', cls: 'evd', html: '<span class="k">claimed_line_item_minor</span><b>189900</b> → ₹1,899 · the authority', anchor: V3(1, .05, .78), dx: 14, valign: 'm' },
+    { key: 'ev4', cls: 'evd', html: '<span class="k">return_record</span>null', anchor: V3(1, -.25, .78), dx: 14, valign: 'm' },
+    { key: 'verdict', cls: 'chip', html: 'VALUE_NOT_AUTHORISED <i>block</i>', anchor: V3(1, gateH(1) / 2, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'never', html: 'gates 03–06 · never ran', anchor: V3(3.5, gateH(3) / 2 + .1, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'intent', html: 'intent · never written', anchor: V3(X.intent, .32, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'rail', cls: 'hi', html: 'rail · call 0', anchor: V3(X.rail, .55, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'egress', html: 'upstream mcp · your existing server', anchor: V3(X.egress, .9, 0), align: 'c', valign: 'b', dy: -8 },
+  ];
+
+  /* ── dive: inspection of the machine, one layer at a time ── */
+  const diveLabelDefs = () => [
+    { key: 'proxy', cls: 'hold', html: 'ai stops here', anchor: V3(X.proxy, 1.42, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'mandate', cls: 'hi', html: 'mandate', anchor: V3(X.mandate, .875, 0), align: 'c', valign: 'b', dy: -10 },
+    ...X.gates.map((x, i) => ({ key: 'g' + i, cls: i === 4 ? 'hold' : 'hi', html: GATE_NAMES[i], anchor: V3(x, i === 4 ? G5_LIFT + gateH(i) / 2 : gateH(i) / 2, 0), align: 'c', valign: 'b', dy: -10 })),
+    { key: 'g4note', cls: 'hold evd', html: '<span class="k" style="color:var(--hold)">not in the path</span>advisory · can hold or block · can never allow', anchor: V3(4, G5_LIFT - gateH(4) / 2, 0), align: 'c', dy: 12 },
+    { key: 'intent', cls: 'hi', html: 'durable intent', anchor: V3(X.intent, .32, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'rail', cls: 'hi', html: 'rail · at most once', anchor: V3(X.rail, .55, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'out', cls: 'ok', html: '<i class="tick"></i>outcome verified', anchor: V3(X.rail, -.5, 0), align: 'c', dy: 12 },
+    { key: 'egress', html: 'upstream mcp', anchor: V3(X.egress, .9, 0), align: 'c', valign: 'b', dy: -8 },
+  ];
+  const diveCamFor = (i, aspect) => {
+    if (i < 0) return { cam: revealCam(aspect), tgt: [.6, -.1, 0], fov: 38, fog: .018 };
+    if (i >= 6) return { cam: [X.intent - 1.2, 1.5, 4.8], tgt: [X.intent + 1.1, -.05, 0], fov: 38, fog: .025 };
+    const x = X.gates[i], y = i === 4 ? .35 : 0; return { cam: [x - 1.2, 1.35 + y, 3.9], tgt: [x + .3, -.05 + y, 0], fov: 38, fog: .025 };
+  };
+
+  /* ── act II ── */
+  const killLabelDefs = () => [
+    { key: 'state', cls: 'big', html: 'PROPOSED', anchor: V3(-1.0, .5, .31), align: 'l', valign: 'b', dy: -22 },
+    { key: 'disk', html: 'on disk · sqlite · write-ahead log', anchor: V3(-2.3, 0, 1.4), dy: 10 },
+    { key: 'proc', cls: 'hi', html: 'process', anchor: V3(.05, 1.5, 0), align: 'c', valign: 'b', dy: -8 },
+    { key: 'dead', cls: 'bad', html: 'process terminated · kill -9', anchor: V3(.05, 1.5, 0), align: 'c', valign: 'b', dy: -8 },
+    { key: 'boot', cls: 'hi', html: 'new process · boot', anchor: V3(.05, 1.5, 0), align: 'c', valign: 'b', dy: -8 },
+    { key: 'rail', cls: 'hi', html: 'rail', anchor: V3(2.9, .72, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'fsync', cls: 'evd hi', html: '<span class="k">write-ahead</span>fsynced <b>before</b> the call', anchor: V3(-.4, .52, 0), dx: 14, dy: 4 },
+    { key: 'lease', html: 'lease · +30s', anchor: V3(-.25, .51, .36), dx: 10, valign: 'm' },
+    { key: 'lease0', cls: 'hold', html: 'lease expired', anchor: V3(-.25, .51, .36), dx: 10, valign: 'm' },
+    { key: 'call', cls: 'hi', html: 'rail call · in flight', anchor: V3(1.2, .95, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'unknown', cls: 'hold', html: 'did the rail act? unknown', anchor: V3(1.2, .95, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'found', cls: 'evd hi', html: '<span class="k">found on disk at boot</span>not retried', anchor: V3(-.2, .95, 0), dx: -14, align: 'r', valign: 'm' },
+    { key: 'probe', cls: 'hold', html: 'reconciling · ×<b data-n>1</b> · pages read, nothing found', anchor: V3(1.3, 1.62, -.4), align: 'c', valign: 'b', dy: -10 },
+    { key: 'quar', cls: 'bad', html: 'quarantined · a named human decides', anchor: V3(-.55, 0, .62), align: 'c', dy: 14 },
+  ];
+  /* one pose per state, sub-beats from the fraction scrolled through that state's row */
+  function killPose(i, f){
+    const s = { slabOn: 0, fill: 0, row: 0, proc: 1, packetOn: 1, packetT: 0, write: 0, writeOn: 0, call: 0, callOn: 0, ghost: 0, read: 0, probes: 0, lease: 0, leaseOn: 0, leaseExpired: 0, terminal: 0, terminalHold: 0, quarantine: 0, fsync: 0, parallax: 1 };
+    if (i >= 0){ s.slabOn = 1; s.row = 1; }
+    if (i >= 1){ s.fill = 1; }
+    if (i === 2){ s.write = smooth(range(f, 0, .3)); s.writeOn = 1; s.fsync = 1; s.lease = smooth(range(f, .3, .5)); s.leaseOn = s.lease > 0 ? 1 : 0; s.call = smooth(range(f, .5, 1)); s.callOn = 1; s.packetT = .7 * smooth(range(f, .55, 1)); }
+    if (i >= 3){ s.write = 1; s.lease = 1; s.leaseOn = 1; s.call = 1; s.packetT = .7; }
+    if (i === 3){ const fade = 1 - smooth(range(f, 0, .45)); s.proc = fade; s.packetOn = fade; s.callOn = fade; s.writeOn = fade * .6; s.ghost = smooth(range(f, .2, .6)); s.lease = 1 - smooth(range(f, .5, 1)); }
+    if (i >= 4){ s.proc = 0; s.packetOn = 0; s.callOn = 0; s.writeOn = .35; s.ghost = 1; s.lease = 0; s.leaseOn = 0; s.leaseExpired = 1; s.terminal = 1; s.terminalHold = 1; s.parallax = 0; }
+    if (i === 4){ s.proc = smooth(range(f, 0, .3)); s.read = smooth(range(f, .2, .5)); }
+    if (i >= 5){ s.proc = 1; s.read = 1; }
+    if (i >= 6){ s.parallax = .5; }
+    if (i === 6){ s.probes = f * 6; }
+    if (i >= 7){ s.probes = 7; s.quarantine = 1; s.terminal = .35; s.terminalHold = 0; s.proc = .3; s.read = 0; }
+    return s;
+  }
+  const KILL_STATE = ['PROPOSED', 'AUTHORIZED', 'IN_FLIGHT', 'IN_FLIGHT', 'UNKNOWN', 'UNKNOWN', 'RECONCILING', 'QUARANTINED'];
+  const KILL_CLS = ['', 'ok', '', '', 'hold', 'hold', 'hold', 'bad'];
+
+  /* ── the invitation: a clean path, camera still ── */
+  const ctaLabelDefs = () => [
+    { key: 'packet', cls: 'txt', html: 'create_refund · ₹2,800', anchor: V3(), dy: -12, align: 'c', valign: 'b' },
+    { key: 'g4', cls: 'hold', html: '05 · off by default · not in the path', anchor: V3(4, G5_LIFT + gateH(4) / 2, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'call1', cls: 'hi', html: 'rail · call 1', anchor: V3(X.rail, .55, 0), align: 'c', valign: 'b', dy: -10 },
+    { key: 'applied', cls: 'big ok', html: 'APPLIED<small style="color:var(--allow)">verified against the ledger</small>', anchor: V3(X.rail, -.55, 0), align: 'c', dy: 16 },
+    { key: 'intent', cls: 'hi', html: 'intent · fsynced first', anchor: V3(X.intent, .32, 0), align: 'c', valign: 'b', dy: -10 },
+  ];
+  const CTA_PATH = [[0, X.agent], [.22, X.proxy], [.30, X.mandate], [.70, 5], [.74, X.intent], [.86, X.rail]];
+  const ctaX = q => { for (let i = 0; i < CTA_PATH.length - 1; i++){ const [qa, xa] = CTA_PATH[i], [qb, xb] = CTA_PATH[i + 1]; if (q <= qb) return lerp(xa, xb, range(q, qa, qb)); } return X.rail; };
+
+  /* build label sets */
+  for (const s of slots){
+    const holder = s.el.querySelector('[data-labels]');
+    const defs = s.kind === 'hero' ? heroLabelDefs() : s.kind === 'dive' ? diveLabelDefs() : s.kind === 'kill' ? killLabelDefs() : ctaLabelDefs();
+    s.labels = new Labels(holder, defs); s.label = k => s.labels.defs.find(d => d.key === k);
+  }
+
+  /* ═══ ScrollController ═══ */
+  const hero = byKind('hero'), dive = byKind('dive'), kill = byKind('kill'), cta = byKind('cta');
+  const dom = {
+    track: document.getElementById('track-hero'), copyWrap: document.getElementById('hero-copy-wrap'), copy: document.querySelector('.hero-copy'), readout: document.querySelector('.readout'),
+    caps: [...document.querySelectorAll('.xr-cap')], heroIndex: hero.el.querySelector('.xr-index'), heroLayer: hero.el.querySelector('[data-xr="layer"]'), heroBar: hero.el.querySelector('[data-xr="bar"]'),
+    gates: [...document.querySelectorAll('.machine .gate')], machineOut: document.querySelector('.machine-out'),
+    diveIndex: dive.el.querySelector('.xr-index'), diveLayer: dive.el.querySelector('[data-xr="layer"]'), diveBar: dive.el.querySelector('[data-xr="bar"]'),
+    states: document.getElementById('states'), ticks: [...document.querySelectorAll('#states .ticks i')],
+    ctaRows: [...document.querySelectorAll('.final .trace [data-q]')],
+  };
+  const SC = {
+    vh: innerHeight, heroP: motion ? 0 : 1, diveI: -1, killI: -1, killFrac: 0, ctaQ: motion ? 0 : 1,
+    update(){
+      this.vh = innerHeight;
+      if (!motion) return;
+      /* hero: the stage pins once the copy above it (phones) has scrolled away */
+      const tr = dom.track.getBoundingClientRect();
+      const copyH = dom.copyWrap.offsetHeight;
+      const total = tr.height - copyH - this.vh;
+      this.heroP = total > 10 ? clamp(-(tr.top + copyH) / total) : 1;
+      /* dive: the gate being read is the last one whose top has passed 48% of the viewport */
+      let di = -1; const line = this.vh * .48;
+      dom.gates.forEach((g, i) => { if (g.getBoundingClientRect().top < line) di = i; });
+      if (dom.machineOut.getBoundingClientRect().top < line) di = 6;
+      if (dom.gates[0].getBoundingClientRect().top > this.vh * 1.1) di = -1;
+      this.diveI = di;
+      /* act II: rows that have crossed 58% of the viewport, and how far */
+      let ki = -1, frac = 0; const kl = this.vh * .58;
+      [...dom.states.children].forEach((r, i) => { const rc = r.getBoundingClientRect(); if (rc.top < kl){ ki = i; frac = clamp((kl - rc.top) / Math.max(1, rc.height)); } });
+      this.killI = ki; this.killFrac = frac;
+      /* the invitation: how far it has risen into view; exactly 1 at the end of the page */
+      const cr = cta.el.getBoundingClientRect();
+      const maxScroll = document.documentElement.scrollHeight - this.vh;
+      const restTop = cr.top - (maxScroll - scrollY);
+      const denom = this.vh - restTop;
+      this.ctaQ = denom > 40 ? clamp((this.vh - cr.top) / denom) : 1;
+    }
+  };
+
+  /* ═══ per-slot pose sampling ═══ */
+  const tmpV = V3();
+  const vertical = aspect => aspect < 1;
+  function heroTarget(s, p, aspect){
+    const k = sampleKeys(heroKeys, p);
+    if (p > .80){ const t = range(p, .80, .92); const rc = revealCam(aspect); const a = sampleKeys(heroKeys, .80).cam; k.cam = [lerp(a[0], rc[0], t), lerp(a[1], rc[1], t), lerp(a[2], rc[2], t)]; }
+    if (!motion){ k.cam = revealCam(aspect); k.tgt = [aspect >= 1 && !coarse ? 3.0 : .6, -.1, 0]; k.shutter = 1; k.barA = 1; k.barB = 1; k.packetX = STOP_X; k.ghost = 0; k.parsed = 1; k.fog = .018; }
+    const v = vertical(aspect) ? smooth(range(p, .80, .96)) : 0; k.up = [-v, 1 - v, 0];
+    if (!motion && vertical(aspect)) k.up = [-1, 0, 0];
+    return k;
+  }
+  function heroShow(s, p, pose){
+    const show = s.show; show.clear();
+    const on = (k, a, b) => { if (p >= a && p < b) show.add(k); };
+    on('agent', 0, .17); on('pSans', 0, .225); on('pMono', .225, .70); on('pBad', .70, .84); on('pBad2', .84, 1.01);
+    on('proxy', .12, .27); on('det', .215, .30); on('mandate', .255, .37); on('g0', .31, .45); on('g0pass', .355, .47); on('g1', .40, .59);
+    on('probe', .485, .555); on('ev1', .565, .84); on('ev2', .605, .84); on('ev3', .64, .84); on('ev4', .665, .84);
+    on('verdict', .70, 1.01); on('never', .83, 1.01); on('intent', .86, 1.01); on('rail', .885, 1.01); on('proxy', .84, 1.01); on('egress', .90, 1.01);
+    if (!motion){ show.clear(); ['pBad2', 'proxy', 'mandate', 'g0', 'g1', 'verdict', 'never', 'intent', 'rail', 'ev3'].forEach(k => show.add(k)); }
+    /* the packet's own labels ride with it */
+    const pp = stack.packetPos(pose.packetX, tmpV); ['pSans', 'pMono', 'pBad'].forEach(k => s.label(k).anchor.set(pp.x, pp.y + .08, pp.z)); s.label('pBad2').anchor.set(pp.x, pp.y - .08, pp.z);
+  }
+  function heroDom(p){
+    if (!motion) return;
+    const fade = coarse ? 1 : 1 - smooth(range(p, .03, .11));
+    dom.copy.style.opacity = fade; dom.copy.style.transform = coarse ? '' : `translateY(${(1 - fade) * -14}px)`; dom.copy.classList.toggle('gone', fade < .05);
+    const rf = 1 - smooth(range(p, .05, .14));
+    dom.readout.style.opacity = rf; dom.readout.style.transform = `translateY(${(1 - rf) * 16}px)`; dom.readout.classList.toggle('gone', rf < .05);
+    for (const c of dom.caps){ const r = heroCaps.find(x => x[0] === c.dataset.cap); c.classList.toggle('on', !!r && p >= r[1] && p < r[2]); }
+    let name = heroIndex[0][1]; for (const [a, n] of heroIndex) if (p >= a) name = n;
+    if (dom.heroLayer.textContent !== name) dom.heroLayer.textContent = name;
+    dom.heroBar.style.width = (p * 100).toFixed(1) + '%';
+    dom.heroIndex.classList.toggle('on', p > .08 && p < .995);
+  }
+
+  function diveTarget(s, i, aspect){
+    const k = Object.assign({}, BASE, diveCamFor(motion ? i : -1, aspect));
+    const hov = IC.hover;
+    k.aG = X.gates.map((x, j) => j === i ? 1 : j === hov ? .85 : (Math.abs(j - i) === 1 ? .55 : .36));
+    if (i === 4) k.aG[4] = 1;
+    k.aMandate = i < 0 ? .7 : i === 0 ? .6 : .35; k.aIntent = i >= 6 ? 1 : i < 0 ? .5 : .2; k.aRail = i >= 6 ? .9 : i < 0 ? .5 : .2; k.railOk = i >= 6 ? 1 : 0;
+    k.aProxy = i < 0 ? .8 : .4; k.aAgent = i < 0 ? .6 : .3; k.packetOn = 0; k.packetX = X.agent;
+    k.up = [vertical(aspect) ? -1 : 0, vertical(aspect) ? 0 : 1, 0];
+    if (!motion){ k.aG = [1, 1, 1, 1, 1, 1]; k.aMandate = .9; k.aIntent = .9; k.aRail = .9; }
+    return k;
+  }
+  function diveShow(s, i){
+    const show = s.show; show.clear();
+    if (!motion || i < 0){ ['proxy', 'mandate', 'g0', 'g1', 'g2', 'g3', 'g4', 'g5', 'intent', 'rail', 'egress'].forEach(k => show.add(k)); return; }
+    if (i >= 6){ show.add('g5'); show.add('intent'); show.add('rail'); show.add('out'); show.add('egress'); return; }
+    show.add('g' + i); if (i > 0) show.add('g' + (i - 1)); if (i < 5) show.add('g' + (i + 1)); if (i === 0) show.add('mandate'); if (i === 4) show.add('g4note');
+    if (IC.hover >= 0) show.add('g' + IC.hover);
+  }
+  function diveDom(i){
+    const name = i < 0 ? 'the stack' : i >= 6 ? 'intent · rail' : 'gate ' + GATE_NAMES[i];
+    if (dom.diveLayer.textContent !== name) dom.diveLayer.textContent = name;
+    dom.diveBar.style.width = (i < 0 ? 0 : i >= 6 ? 100 : ((i + 1) / 6) * 100) + '%';
+    dom.diveIndex.classList.toggle('on', motion);
+    dom.gates.forEach((g, j) => g.classList.toggle('focus', j === IC.hover));
+  }
+
+  function killTarget(s, i, frac, aspect){
+    const k = killPose(motion ? i : 7, motion ? frac : 1);
+    k.cam = [2.5, 1.9, 4.6]; k.tgt = [.55, .45, 0]; k.fov = 36; k.fog = .02; k.up = [0, 1, 0];
+    return k;
+  }
+  function killShow(s, i, frac, pose){
+    const show = s.show; show.clear(); if (!motion){ i = 7; frac = 1; }
+    if (i >= 0) show.add('state'); show.add('rail');
+    if (i >= 0 && i < 3) show.add('proc'); if (i === 3) show.add('dead'); if (i === 4 && pose.proc > .3) show.add('boot');
+    if (i >= 1) show.add('disk');
+    if (i === 2 && frac > .05) show.add('fsync'); if (i >= 2 && i < 4 && (i > 2 || frac > .3)) show.add('lease'); if (i === 2 && frac > .5) show.add('call'); if (i === 3) show.add('unknown');
+    if (i >= 4 && i < 7) { show.add('lease0'); } if (i >= 4 && i < 6) { show.add('found'); }
+    if (i === 6) show.add('probe'); if (i >= 7) show.add('quar');
+    const st = s.label('state'); const idx = clamp(i, 0, 7);
+    const n = Math.max(1, Math.min(6, Math.ceil(frac * 6 - 1e-6)));
+    const txt = KILL_STATE[idx] + (idx === 6 ? ' ×' + n : '');
+    if (st.el.dataset.txt !== txt){ st.el.dataset.txt = txt; st.el.innerHTML = txt; st.el.className = 'lab big ' + KILL_CLS[idx] + (st.on ? ' on' : ''); }
+    const pr = s.label('probe').el.querySelector('[data-n]'); if (pr && pr.textContent != n) pr.textContent = n;
+  }
+  function killDom(i, frac){
+    if (!motion) return;
+    [...dom.states.children].forEach((r, j) => r.classList.toggle('on', j <= i));
+    const n = i > 6 ? 6 : i === 6 ? Math.min(6, Math.ceil(frac * 6 - 1e-6)) : 0;
+    dom.ticks.forEach((t, j) => t.classList.toggle('on', j < n));
+  }
+
+  function ctaTarget(s, q, aspect){
+    const px = ctaX(q);
+    const passed = x => smooth(range(px, x - .3, x + .05));
+    const k = Object.assign({}, BASE, { packetX: Math.min(px, X.rail - .05), packetOn: q > .005 && q < .995 ? 1 : 0, ghost: 1 - passed(X.proxy), parsed: passed(X.proxy), glow: clamp(1 - Math.abs(px - X.proxy) / .5) * .8 });
+    k.aAgent = .6; k.aProxy = lerp(.55, .9, passed(X.proxy)); k.aMandate = lerp(.35, .85, passed(X.mandate));
+    k.aG = X.gates.map((x, i) => i === 4 ? .5 : lerp(.36, .85, passed(x))); k.tick = X.gates.map((x, i) => i === 4 ? 0 : passed(x + .12));
+    k.aIntent = lerp(.2, 1, passed(X.intent)); k.aRail = lerp(.2, .9, passed(X.rail)); k.railOk = q >= .95 ? 1 : 0;
+    k.verifyOut = smooth(range(q, .88, .92)); k.verifyBack = smooth(range(q, .93, .96));
+    k.cam = revealCam(aspect); k.tgt = [.6, -.1, 0]; k.fov = 38; k.fog = .018; k.up = [vertical(aspect) ? -1 : 0, vertical(aspect) ? 0 : 1, 0];
+    if (!motion){ k.packetOn = 0; k.railOk = 1; k.aIntent = 1; k.aRail = .9; k.tick = [1, 1, 1, 1, 0, 1]; k.aG = [.85, .85, .85, .85, .5, .85]; k.aMandate = .85; k.aProxy = .9; }
+    return k;
+  }
+  function ctaShow(s, q, pose){
+    const show = s.show; show.clear();
+    if (motion && q > .01 && q < .95) show.add('packet');
+    if (q > .58 && q < .70) show.add('g4');
+    if (q >= .86) show.add('call1'); if (q >= .74) show.add('intent'); if (q >= .95) show.add('applied');
+    const pp = stack.packetPos(pose.packetX, tmpV); s.label('packet').anchor.set(pp.x, pp.y + .08, pp.z);
+    dom.ctaRows.forEach(r => r.classList.toggle('lit', q >= parseFloat(r.dataset.q)));
+  }
+
+  /* ═══ the frame loop ═══ */
+  let last = performance.now(), awake = true, rafId = 0, firstFrame = true, lastScrollY = -1, frameAvg = 16;
+  const RATES = { cam: 6, tgt: 6, up: 4, fov: 5, fog: 4, packetX: 9, packetOn: 6, ghost: 6, parsed: 6, glow: 8, shutter: 8, barA: 10, barB: 10, probeOut: 10, probeBack: 10, verifyOut: 10, verifyBack: 10,
+                  aAgent: 5, aProxy: 5, aMandate: 5, aG: 5, tick: 8, aIntent: 5, aRail: 5, railOk: 6,
+                  slabOn: 6, fill: 5, row: 5, proc: 4, packetT: 6, write: 8, writeOn: 6, call: 6, callOn: 5, ghost: 4, read: 8, probes: 12, lease: 5, leaseOn: 6, leaseExpired: 5, terminal: 5, terminalHold: 5, quarantine: 5, parallax: 2 };
+  function wake(){ if (!awake){ awake = true; last = performance.now(); rafId = requestAnimationFrame(frame); } }
+  function rectOf(el){ const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height, bottom: r.bottom }; }
+  function renderSlot(s, scene){
+    const r = s.rect, w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+    const H = canvas.clientHeight || innerHeight;
+    const left = Math.round(r.left), bottom = Math.round(H - r.bottom);
+    const clipTop = Math.max(r.top, 58);                              /* nothing is ever painted under the header */
+    const ch = Math.round(r.bottom - clipTop); if (ch <= 0) return;
+    renderer.setViewport(left, bottom, w, h);
+    renderer.setScissor(left, bottom, w, ch); renderer.setScissorTest(true);
+    renderer.setClearColor(C.bg, 1); renderer.clear();
+    s.camera.aspect = w / h; s.camera.updateProjectionMatrix();
+    renderer.render(scene, s.camera);
+  }
+  function placeCamera(s, k, gain = 1){
+    const cam = s.camera;
+    cam.fov = k.fov; cam.position.set(k.cam[0], k.cam[1], k.cam[2]);
+    tmpV.set(k.tgt[0], k.tgt[1], k.tgt[2]);
+    if (finePointer && motion && gain > 0){
+      const d = cam.position.distanceTo(tmpV); const up = V3(k.up[0], k.up[1], k.up[2]).normalize(); const fwd = tmpV.clone().sub(cam.position).normalize(); const right = fwd.clone().cross(up).normalize();
+      cam.position.addScaledVector(right, IC.px * d * .016 * gain).addScaledVector(up, -IC.py * d * .012 * gain);
+    }
+    cam.up.set(k.up[0], k.up[1], k.up[2]).normalize(); cam.lookAt(tmpV); cam.updateMatrixWorld();
+  }
+  function frame(now){
+    rafId = 0;
+    const dt = Math.min(.05, Math.max(.001, (now - last) / 1000)); last = now;
+    frameAvg = frameAvg * .95 + dt * 1000 * .05;
+    if (frameAvg > 30 && dpr > 1){ dpr = Math.max(1, dpr - .25); renderer.setPixelRatio(dpr); frameAvg = 16; }
+    SC.update(); IC.step(dt);
+    renderer.setScissorTest(false); renderer.setClearColor(C.bg, 0); renderer.clear();
+    let moving = Math.abs(IC.px - IC.tx) > 1e-3 || Math.abs(IC.py - IC.ty) > 1e-3;
+    for (const s of slots){
+      s.rect = rectOf(s.el);
+      const onScreen = s.rect.bottom > -20 && s.rect.top < innerHeight + 20 && s.rect.width > 2 && s.rect.height > 2;
+      if (!onScreen && !s.visible) continue;
+      const aspect = s.rect.width / Math.max(1, s.rect.height);
+      let tgt, p;
+      if (s.kind === 'hero'){ p = SC.heroP; tgt = heroTarget(s, p, aspect); }
+      else if (s.kind === 'dive'){ p = SC.diveI; tgt = diveTarget(s, p, aspect); }
+      else if (s.kind === 'kill'){ p = SC.killI + SC.killFrac; tgt = killTarget(s, SC.killI, SC.killFrac, aspect); }
+      else { p = SC.ctaQ; tgt = ctaTarget(s, p, aspect); }
+      const first = !s.pose.cam;
+      const jump = s.lastP !== null && Math.abs(p - s.lastP) > .2;                 /* a hash jump: snap, do not replay */
+      if (first && s.kind === 'hero' && motion){ Object.assign(s.pose, tgt); s.pose.packetX = X.agent - 1.2; s.pose.packetOn = 0; s.pose.cam = tgt.cam.slice(); s.pose.tgt = tgt.tgt.slice(); }   /* the request arrives on its own */
+      dampPose(s.pose, tgt, first || jump ? 1e9 : dt, RATES);
+      s.lastP = p;
+      if (!settled(s.pose, tgt)) moving = true;
+      if (!onScreen) continue;
+      const k = s.pose;
+      if (s.kind === 'hero'){ heroShow(s, p, k); heroDom(p); placeCamera(s, k); stackScene.fog.density = k.fog; stack.apply(k); renderSlot(s, stackScene); }
+      else if (s.kind === 'dive'){ diveShow(s, p); diveDom(p); placeCamera(s, k); stackScene.fog.density = k.fog; stack.apply(k); renderSlot(s, stackScene); }
+      else if (s.kind === 'kill'){ killShow(s, SC.killI, SC.killFrac, k); killDom(SC.killI, SC.killFrac); placeCamera(s, k, k.parallax); dur.apply(k); renderSlot(s, killScene); }
+      else { ctaShow(s, p, k); placeCamera(s, k); stackScene.fog.density = k.fog; stack.apply(k); renderSlot(s, stackScene); }
+      s.labels.update(s.camera, s.rect.width, s.rect.height, s.show);
+    }
+    if (firstFrame){ firstFrame = false; root.classList.add('ready'); moving = true; }
+    if (scrollY !== lastScrollY){ lastScrollY = scrollY; moving = true; }
+    awake = moving && !document.hidden;
+    if (awake) rafId = requestAnimationFrame(frame);
+  }
+
+  /* ═══ resize · scroll · hover ═══ */
+  let lastW = 0, lastH = 0;
+  function resize(){ const w = innerWidth, h = canvas.clientHeight || innerHeight; if (w !== lastW || h !== lastH){ lastW = w; lastH = h; renderer.setSize(w, h, false); } wake(); }
+  resize();
+  addEventListener('resize', resize, { passive: true });
+  addEventListener('orientationchange', resize, { passive: true });
+  addEventListener('scroll', wake, { passive: true });
+  if (window.ResizeObserver){ const ro = new ResizeObserver(() => wake()); slots.forEach(s => ro.observe(s.el)); }
+
+  if (finePointer && motion){
+    const hit = dive.el.querySelector('[data-labels]'); const ray = new THREE.Raycaster(); const nd = new THREE.Vector2();
+    const pick = e => { const r = dive.rect; if (!r) return -1; nd.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(nd, dive.camera); const hits = ray.intersectObjects(stack.hits, false); return hits.length ? hits[0].object.userData.gate : -1; };
+    hit.addEventListener('pointermove', e => { const h = pick(e); if (h !== IC.hover){ IC.hover = h; dive.el.classList.toggle('hovering', h >= 0); wake(); } });
+    hit.addEventListener('pointerleave', () => { IC.hover = -1; dive.el.classList.remove('hovering'); wake(); });
+    hit.addEventListener('click', e => { const h = pick(e); if (h >= 0 && dom.gates[h]) dom.gates[h].scrollIntoView({ block: 'center', behavior: 'smooth' }); });
+  }
+
+  rafId = requestAnimationFrame(frame);
+  addEventListener('pagehide', () => { if (rafId) cancelAnimationFrame(rafId); });
+})();
+</script>
+<!-- gl:js:end -->
+</body>
+</html>
