@@ -332,9 +332,57 @@ describe('the drift sweep', () => {
 
     const report = await createSweep({ store, rail: broken, now: () => clock }).runOnce();
     expect(report.complete).toBe(false);
+    // Both are inferred from rows we never read.
     expect(report.phantoms).toEqual([]);
     expect(report.orphans).toEqual([]);
-    expect(report.duplicates).toEqual([]);
+  });
+
+  it('still reports a duplicate it saw before the walk broke', async () => {
+    // Two refunds carrying one sik, plus two unrelated ones. Page size is 3, so
+    // the duplicate is on page one and the walk dies on page two.
+    for (const [n, receipt] of [
+      [1, sikReceipt(sikFor(1))],
+      [1, `dup_${sikFor(1)}`.slice(0, 40)],
+      [3, sikReceipt(sikFor(3))],
+      [4, sikReceipt(sikFor(4))],
+    ] as const) {
+      await rail.createRefund({
+        payment_id: paymentId,
+        amount_minor: 340_000,
+        receipt,
+        notes: { interlock_sik: sikFor(n) },
+      });
+    }
+
+    const flaky = {
+      ...rail,
+      listRefunds: async (sinceMs: number, cursor?: string | null) => {
+        if (cursor === null || cursor === undefined) return rail.listRefunds(sinceMs, cursor);
+        throw new RailUnavailableError('listRefunds', 'partitioned after page one');
+      },
+    };
+
+    const before = store.audit.count();
+    const report = await createSweep({ store, rail: flaky, now: () => clock }).runOnce();
+
+    // A duplicate is a fact about rows we read: it survives the partial walk.
+    expect(report.complete).toBe(false);
+    expect(report.pages).toBe(1);
+    expect(report.duplicates).toHaveLength(1);
+    expect(report.duplicates[0]?.sik).toBe(sikFor(1));
+    expect(report.duplicates[0]?.rail_entity_ids).toEqual([
+      'rfnd_MOCK0000000001',
+      'rfnd_MOCK0000000002',
+    ]);
+
+    // The absence classes stay silent even though sik 3 would look orphaned.
+    expect(report.phantoms).toEqual([]);
+    expect(report.orphans).toEqual([]);
+
+    // And the alarm reaches the audit chain rather than being discarded.
+    expect(store.audit.count()).toBe(before + 1);
+    expect(store.audit.head()?.kind).toBe('SWEEP_DUPLICATE');
+    expect(store.audit.verifyChain()).toBeNull();
   });
 
   it('records each finding in the audit chain', async () => {

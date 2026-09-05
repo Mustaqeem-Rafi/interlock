@@ -21,12 +21,19 @@ import { sikOf } from './reconciler.js';
  *   ORPHAN           a rail entity inside the window with no intent row at all.
  *                    Money left by a path that did not go through the gate.
  *
- * Trap 1 applies here exactly as it does in the reconciler, and for the same
- * reason: a partial enumeration cannot support a claim of absence. If the walk
- * does not reach the end, the report comes back `complete: false` with no
- * phantoms and no orphans, because both are absence claims. Duplicates are a
- * presence claim and would still be sound, but they are withheld too rather than
- * have callers reason about which half of a report to trust.
+ * Trap 1 applies here as it does in the reconciler, but the three classes are
+ * not equally exposed to it, and that difference decides what an incomplete
+ * walk is allowed to report:
+ *
+ *   - DUPLICATE is a *presence* claim. Two entities carrying one sik is a fact
+ *     about rows we actually read, and no number of unread pages can make it
+ *     false. So it is reported even from an incomplete walk. It is the most
+ *     severe finding here, and going quiet about it during a rail incident —
+ *     precisely when it is most likely to happen — is the wrong direction to
+ *     fail in.
+ *   - PHANTOM_SUCCESS and ORPHAN are *absence* claims, inferred from rows we
+ *     did not read. An incomplete walk cannot support either, so they are
+ *     withheld and `complete: false` records that they were never evaluated.
  */
 
 export const SWEEP_INTERVAL_MS = 60_000;
@@ -83,12 +90,6 @@ export interface Sweep {
   start(): () => void;
 }
 
-const EMPTY: Omit<SweepReport, 'complete' | 'scanned_entities' | 'scanned_intents' | 'pages'> = {
-  duplicates: [],
-  phantoms: [],
-  orphans: [],
-};
-
 export function createSweep(options: SweepOptions): Sweep {
   const { store, rail } = options;
   const now = options.now ?? ((): number => Date.now());
@@ -133,17 +134,6 @@ export function createSweep(options: SweepOptions): Sweep {
       const { refunds, pages, complete } = await enumerate(since);
       const intents = store.intents.list({ updatedSince: since });
 
-      if (!complete) {
-        // A partial walk supports no conclusion. Say so and stop.
-        return {
-          complete: false,
-          scanned_entities: refunds.length,
-          scanned_intents: intents.length,
-          pages,
-          ...EMPTY,
-        };
-      }
-
       const entitiesBySik = new Map<string, Refund[]>();
       const unstamped: Refund[] = [];
       for (const refund of refunds) {
@@ -157,9 +147,8 @@ export function createSweep(options: SweepOptions): Sweep {
         entitiesBySik.set(sik, group);
       }
 
-      const intentsBySik = new Map<string, IntentRow>();
-      for (const intent of intents) intentsBySik.set(intent.sik, intent);
-
+      // Computed before the completeness gate on purpose: sound on whatever we
+      // managed to read. See the note on presence claims at the top of the file.
       const duplicates: DuplicateFinding[] = [];
       for (const [sik, group] of entitiesBySik) {
         if (group.length > 1) {
@@ -171,6 +160,23 @@ export function createSweep(options: SweepOptions): Sweep {
           });
         }
       }
+
+      if (!complete) {
+        // Raise what we know; refuse to guess at what we do not.
+        auditFindings(duplicates, at);
+        return {
+          complete: false,
+          scanned_entities: refunds.length,
+          scanned_intents: intents.length,
+          pages,
+          duplicates,
+          phantoms: [],
+          orphans: [],
+        };
+      }
+
+      const intentsBySik = new Map<string, IntentRow>();
+      for (const intent of intents) intentsBySik.set(intent.sik, intent);
 
       const orphans: OrphanFinding[] = [
         ...unstamped.map(
