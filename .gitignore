@@ -21,6 +21,7 @@ vitest.local.config.ts
 # create a second copy of the source that can silently disagree with the first.
 npm/*.tgz
 npm/schema.sql
+npm/console.html
 npm/README.md
 npm/LICENSE
 npm/examples/
