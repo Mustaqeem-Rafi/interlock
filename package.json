@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc --build",
     "clean": "tsc --build --clean",
-    "typecheck": "tsc --build --noEmit",
+    "typecheck": "tsc --build",
     "lint": "eslint . && node scripts/check-thin.mjs",
     "check:thin": "node scripts/check-thin.mjs",
     "test": "vitest run",

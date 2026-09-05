@@ -30,6 +30,9 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
+      # tsc --build, not --noEmit: with project references TypeScript rejects
+      # --noEmit (TS6310), and a real build also proves declaration emit works
+      # across package boundaries.
       - name: Typecheck
         run: pnpm run typecheck
 

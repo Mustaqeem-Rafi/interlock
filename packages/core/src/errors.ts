@@ -12,7 +12,13 @@ export type InterlockErrorCode =
   | 'CANONICAL_UNSUPPORTED_TYPE'
   | 'CANONICAL_CYCLE'
   | 'CANONICAL_DEPTH'
-  | 'INVARIANT_VIOLATION';
+  | 'INVARIANT_VIOLATION'
+  | 'STORE_OPEN_FAILED'
+  | 'STORE_DURABILITY_UNAVAILABLE'
+  | 'STORE_DUPLICATE_INTENT'
+  | 'STORE_NOT_FOUND'
+  | 'STORE_STALE_STATE'
+  | 'STORE_CONSTRAINT';
 
 export abstract class InterlockError extends Error {
   abstract readonly code: InterlockErrorCode;
