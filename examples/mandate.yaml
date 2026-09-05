@@ -1,0 +1,121 @@
+# Interlock mandate - the machine-checkable file a human approves.
+#
+# Written by `interlock init`, read by a person, then approved. After that only
+# deterministic code ever reads it: no model is consulted at decision time.
+#
+# Money is an integer in MINOR UNITS (paise). 500000 == Rs 5,000.
+# manifest_sha256 and pinned_manifest are computed by init from the manifest it
+# actually fetched - the model does not get to choose the pin.
+
+v: 1
+mandate_id: mnd_demo_support
+merchant_id: acc_DEMO000001
+agent_id: agent_support_bot
+issued_at: 1700000000000
+expires_at: 2000000000000
+purpose: Resolve customer refund requests for damaged or duplicate orders, up to
+  5,000 rupees per refund, and settle the merchant balance on request.
+scope:
+  grants:
+    fetch_payment: &a1
+      reversibility: reversible
+      value:
+        max_amount_minor: 0
+        min_amount_minor: 0
+        currencies:
+          - INR
+    fetch_order: *a1
+    create_refund:
+      reversibility: irreversible
+      value:
+        max_amount_minor: 500000
+        min_amount_minor: 100
+        currencies:
+          - INR
+    create_instant_settlement:
+      reversibility: irreversible
+      value:
+        max_amount_minor: 2000000
+        min_amount_minor: 100
+        currencies:
+          - INR
+limits:
+  windows:
+    - window_ms: 86400000
+      max_calls: 40
+      max_amount_minor: 2000000
+      currency: INR
+  fee_budgets:
+    INR:
+      window_ms: 86400000
+      max_fee_minor: 20000
+idempotency:
+  fetch_payment:
+    key_fields: []
+    window_ms: 60000
+  fetch_order:
+    key_fields: []
+    window_ms: 60000
+  create_refund:
+    key_fields:
+      - payment_id
+    window_ms: null
+  create_instant_settlement:
+    key_fields: []
+    window_ms: 86400000
+provenance:
+  server_id: interlock-mock-rail@0.1.0
+  manifest_sha256: 3721a7f7b443e157669ccc9ed27ccaf4daa2d67dc8367bc1481e2e2b8c4d6c6c
+  pinned_manifest:
+    - name: fetch_payment
+      description: Fetch a payment by id.
+      inputSchema:
+        type: object
+        properties:
+          payment_id:
+            type: string
+    - name: fetch_order
+      description: Fetch an order by id.
+      inputSchema:
+        type: object
+        properties:
+          order_id:
+            type: string
+    - name: create_refund
+      description: Refund a payment. amount is in minor units (paise).
+      inputSchema:
+        type: object
+        properties:
+          payment_id:
+            type: string
+          amount:
+            type: integer
+        required:
+          - payment_id
+          - amount
+    - name: create_instant_settlement
+      description: Settle available balance on demand. amount is in minor units.
+      inputSchema:
+        type: object
+        properties:
+          amount:
+            type: integer
+        required:
+          - amount
+  pinned_manifests:
+    fetch_payment:
+      sha256: 7cdb865bb921a73d889c01a7298358ec2c0689cadb06fa27badc2ec4095cd638
+      trust_tier: pinned
+    fetch_order:
+      sha256: fee183bd47ad14fef06da82f09abd48ed64d181c1a755b5f31bc9fdf5d75be88
+      trust_tier: pinned
+    create_refund:
+      sha256: 52d4053d8642b1d01b89677925bf34c415c19e28cec815e39387dee36d171893
+      trust_tier: pinned
+    create_instant_settlement:
+      sha256: d8acb1ece74487c0d627fd96b78f6c94262e0ab22a8775abeb06ca8702e393b3
+      trust_tier: pinned
+degraded_mode:
+  reversible: hold
+  compensable: hold
+  irreversible: block
