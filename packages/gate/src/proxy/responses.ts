@@ -150,10 +150,19 @@ export function blocked(input: OutcomeInput, reasonCode: string, message: string
 }
 
 /** The decision as recorded, for the store. */
+export interface DecisionContext {
+  readonly agentId: string;
+  readonly tool: string;
+  readonly amountMinor: number;
+  /** Gate overhead for this request, measured by the engine. */
+  readonly latencyMs: number;
+}
+
 export function toDecision(
   input: OutcomeInput,
   verdict: Decision['verdict'],
   decidedAt: number,
+  context: DecisionContext,
 ): Decision {
   return {
     request_id: input.requestId,
@@ -162,5 +171,9 @@ export function toDecision(
     verdict,
     results: [...input.results],
     decided_at: decidedAt,
+    agent_id: context.agentId,
+    tool: context.tool,
+    amount_minor: context.amountMinor,
+    latency_ms: context.latencyMs,
   };
 }

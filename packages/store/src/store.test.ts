@@ -465,6 +465,10 @@ describe('decisions', () => {
       results: [
         { gate: 'g2_value', verdict: 'BLOCK', reason_code: 'AMOUNT_ABOVE_GRANT', message: '', evidence: {} },
       ],
+      agent_id: 'agent_test',
+      tool: 'create_refund',
+      amount_minor: 189_900,
+      latency_ms: 3,
       decided_at: T0 + 7,
     });
 

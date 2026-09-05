@@ -78,12 +78,47 @@ export function openDatabase(path: string): Db {
 
   try {
     db.exec(readFileSync(fileURLToPath(SCHEMA_URL), 'utf8'));
+    migrate(db);
   } catch (error) {
     db.close();
     throw new StoreOpenError(path, error instanceof Error ? error.message : String(error));
   }
 
   return db;
+}
+
+/**
+ * Columns added after a ledger existed.
+ *
+ * CREATE TABLE IF NOT EXISTS is a no-op on a table that is already there, so a
+ * ledger written by an earlier build keeps the old shape and every insert
+ * naming a new column fails. That is a ledger nobody can write to, which on
+ * this system means refunds stop rather than degrade — so the additive case is
+ * handled here rather than left to whoever restarts the process next.
+ *
+ * Additive only, and each column carries a default, so an old row read by new
+ * code gets a defined value instead of null. Anything that needs to drop or
+ * retype a column is a real migration and does not belong in a startup path.
+ */
+const ADDED_COLUMNS: readonly { table: string; column: string; definition: string }[] = [
+  { table: 'decisions', column: 'agent_id', definition: "TEXT NOT NULL DEFAULT ''" },
+  { table: 'decisions', column: 'tool', definition: "TEXT NOT NULL DEFAULT ''" },
+  { table: 'decisions', column: 'amount_minor', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'decisions', column: 'latency_ms', definition: 'INTEGER NOT NULL DEFAULT 0' },
+];
+
+function migrate(db: Db): void {
+  for (const { table, column, definition } of ADDED_COLUMNS) {
+    // Read the shape with a prepared statement rather than db.pragma(): the
+    // pragma helper's return shape is driver-specific, and getting it wrong
+    // here means every ALTER runs on a table that already has the column and
+    // the store refuses to open at all.
+    const columns = db.prepare(`SELECT name FROM pragma_table_info(?)`).all(table) as {
+      name: string;
+    }[];
+    if (columns.some((c) => c.name === column)) continue;
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }
 
 function assertDurability(db: Db): void {

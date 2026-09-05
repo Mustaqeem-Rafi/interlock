@@ -128,6 +128,10 @@ CREATE TABLE IF NOT EXISTS decisions (
   results_json TEXT    NOT NULL,
   decided_at   INTEGER NOT NULL,
   audit_seq    INTEGER NOT NULL,
+  agent_id     TEXT    NOT NULL DEFAULT '',
+  tool         TEXT    NOT NULL DEFAULT '',
+  amount_minor INTEGER NOT NULL DEFAULT 0,
+  latency_ms   INTEGER NOT NULL DEFAULT 0,
 
   CHECK (verdict IN ('ALLOW', 'HOLD', 'BLOCK')),
   CHECK (length(mandate_hash) = 64)

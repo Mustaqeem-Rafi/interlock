@@ -318,7 +318,18 @@ export function createEngine(options: EngineOptions): Engine {
         at,
       });
 
-      store.decisions.record(mandate.merchant_id, toDecision(out, ladder.verdict, at));
+      store.decisions.record(
+        mandate.merchant_id,
+        toDecision(out, ladder.verdict, at, {
+          agentId: options.agentId,
+          tool: name,
+          amountMinor: action.amount_minor,
+          // Measured, not estimated: the gate's own overhead from the moment
+          // the call arrived to the moment a verdict existed. This is the
+          // number the README quotes, so it has to come from the clock.
+          latencyMs: Math.max(0, now() - at),
+        }),
+      );
 
       if (proposed.disposition.kind === 'BLOCK') {
         if (proposed.disposition.reason === 'ALREADY_APPLIED') {

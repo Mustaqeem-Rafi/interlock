@@ -265,9 +265,21 @@ describe('GateResult and Decision', () => {
       verdict: 'BLOCK',
       results: [RESULT],
       decided_at: 1_757_000_100_000,
+      agent_id: 'agent_support_bot',
+      tool: 'create_refund',
+      amount_minor: 4_800_000,
+      latency_ms: 4,
     };
     expect(Decision.safeParse(decision).success).toBe(true);
     expect(Decision.safeParse({ ...decision, results: [] }).success).toBe(false);
     expect(Decision.safeParse({ ...decision, sik: 'lowercase' }).success).toBe(false);
+    // A decision that cannot say what it refused is not a record. These are
+    // required precisely because a BLOCK before Gate 4 never writes an intent
+    // row, so there is nothing to join them from later.
+    for (const field of ['agent_id', 'tool', 'amount_minor', 'latency_ms']) {
+      const without: Record<string, unknown> = { ...decision };
+      delete without[field];
+      expect(Decision.safeParse(without).success).toBe(false);
+    }
   });
 });

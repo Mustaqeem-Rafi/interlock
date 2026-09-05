@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EpochMs, Sha256Hex, Sik } from './primitives.js';
+import { EpochMs, MinorAmount, Sha256Hex, Sik } from './primitives.js';
 
 /** What a deterministic gate may return. */
 export const GateVerdict = z.enum(['ALLOW', 'HOLD', 'BLOCK']);
@@ -40,5 +40,18 @@ export const Decision = z.strictObject({
   verdict: GateVerdict,
   results: z.array(GateResult).min(1),
   decided_at: EpochMs,
+  /**
+   * What was being asked for, carried on the decision itself.
+   *
+   * These could be joined from the intent, except when they could not: a
+   * request refused before Gate 4 never gets an intent row, and those are
+   * exactly the decisions an operator most wants to read. A decision record
+   * that cannot describe what it refused is not much of a record.
+   */
+  agent_id: z.string().min(1),
+  tool: z.string().min(1),
+  amount_minor: MinorAmount,
+  /** Gate overhead, measured. This is the number the README quotes. */
+  latency_ms: z.number().int().nonnegative(),
 });
 export type Decision = z.infer<typeof Decision>;

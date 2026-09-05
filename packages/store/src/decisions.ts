@@ -11,10 +11,14 @@ export interface DecisionRow {
   readonly results_json: string;
   readonly decided_at: number;
   readonly audit_seq: number;
+  readonly agent_id: string;
+  readonly tool: string;
+  readonly amount_minor: number;
+  readonly latency_ms: number;
 }
 
 const DECISION_COLUMNS = `request_id, merchant_id, sik, mandate_hash, verdict,
-  results_json, decided_at, audit_seq`;
+  results_json, decided_at, audit_seq, agent_id, tool, amount_minor, latency_ms`;
 
 export interface DecisionRepository {
   /** Records the ladder's output and the audit record it produced, atomically. */
@@ -36,7 +40,8 @@ export function createDecisionRepository(db: Db): DecisionRepository {
   const insert = db.prepare(
     `INSERT INTO decisions (${DECISION_COLUMNS})
      VALUES (@request_id, @merchant_id, @sik, @mandate_hash, @verdict,
-             @results_json, @decided_at, @audit_seq)`,
+             @results_json, @decided_at, @audit_seq, @agent_id, @tool,
+             @amount_minor, @latency_ms)`,
   );
   const selectOne = db.prepare(`SELECT ${DECISION_COLUMNS} FROM decisions WHERE request_id = ?`);
   const selectForIntent = db.prepare(
@@ -79,6 +84,10 @@ export function createDecisionRepository(db: Db): DecisionRepository {
           results_json: JSON.stringify(decision.results),
           decided_at: decision.decided_at,
           audit_seq: audit.seq,
+          agent_id: decision.agent_id,
+          tool: decision.tool,
+          amount_minor: decision.amount_minor,
+          latency_ms: decision.latency_ms,
         });
 
         return selectOne.get(decision.request_id) as DecisionRow;
