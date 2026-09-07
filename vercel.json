@@ -1,0 +1,43 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+
+  "//": [
+    "Static, and deliberately not a framework. The landing page is one",
+    "self-contained file whose only external references are a CDN copy of",
+    "three.js and Google Fonts, so there is nothing for a bundler to resolve",
+    "and nothing for a server to render. Vercel was serving nothing because it",
+    "found a private pnpm monorepo, ran `tsc --build`, and got no web output.",
+    "",
+    "The build command regenerates the page from its source rather than",
+    "trusting the committed copy — build.mjs imports only node:fs, so no",
+    "install is needed, and a deploy cannot ship a page that drifted from the",
+    "gl.css and gl.js it came from.",
+    "",
+    "The operator console is NOT here. It needs a SQLite ledger opened with",
+    "synchronous = FULL on a disk that survives a restart, and Vercel's",
+    "filesystem is ephemeral. Putting it here would give it a ledger that",
+    "forgets what it paid. It deploys to Render; see docs/DEPLOY.md."
+  ],
+
+  "framework": null,
+  "installCommand": "echo 'no dependencies: the page build uses node:fs only'",
+  "buildCommand": "node docs/design/landing/build.mjs",
+  "outputDirectory": "docs",
+  "cleanUrls": true,
+  "trailingSlash": false,
+
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; base-uri 'none'; form-action 'none'"
+        }
+      ]
+    }
+  ]
+}

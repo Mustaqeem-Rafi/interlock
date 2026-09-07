@@ -52,8 +52,23 @@ Settings → Pages → Source `main`, folder `/docs`. That serves
 `docs/index.html`, which is generated; see [design/README.md](design/README.md)
 for how to rebuild it.
 
-Vercel works too: point it at the repository, no build command, output
-directory `docs`.
+Vercel works too, and `vercel.json` configures it: point Vercel at the
+repository and it reads that file. There is no framework and no install — the
+page build imports only `node:fs` — and the build command regenerates the page
+from `gl.css` and `gl.js` on every deploy, so a deployment cannot ship a page
+that has drifted from its source.
+
+It also sets a content security policy. The page loads three.js from jsdelivr
+and IBM Plex from Google Fonts and nothing else, so the policy names exactly
+those two and `default-src 'none'` for everything else. That was verified by
+serving `docs/` with those headers and confirming the WebGL bootstrap still
+runs — a CSP that is wrong in this direction works locally and breaks only in
+production.
+
+**The console is deliberately not on Vercel.** It needs a SQLite ledger opened
+with `synchronous = FULL` on a disk that survives a restart, and Vercel's
+filesystem is ephemeral: the ledger would forget what it had already paid,
+which is the one thing it exists to remember.
 
 ## What a deployment does not prove
 
