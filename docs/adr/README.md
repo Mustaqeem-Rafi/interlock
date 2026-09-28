@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Five decisions that the rest of the code assumes. Each says what was chosen,
+Six decisions that the rest of the code assumes. Each says what was chosen,
 what it cost, and what it gives up — a record with no consequences section is an
 advertisement.
 
@@ -11,3 +11,4 @@ advertisement.
 | [0003](0003-absence-is-not-absence.md) | The reconciler may only claim absence it has actually established | the three traps, each of which silently double-refunds |
 | [0004](0004-what-broke-and-how-i-got-out.md) | What broke, and how I got out | the first chaos matrix passed, and it was wrong to |
 | [0005](0005-gate-5-is-off-by-default.md) | The purpose gate is opt-in, advisory, and cannot say yes | why `ALLOW` is not in the union |
+| [0006](0006-the-merchants-layer-not-the-rails.md) | Interlock is the merchant's layer, not a copy of the rail's | what survives the gateways shipping their own, and why Interlock owns its tools |
