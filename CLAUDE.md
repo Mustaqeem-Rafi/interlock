@@ -80,15 +80,13 @@ The money path is **100% deterministic**. There is no model in the decision path
 
 If a model gate is ever added, its return type must be `verdict: 'HOLD' | 'BLOCK'` — the union does not contain `ALLOW`, so it *cannot* express an upgrade. That is a type, not a prompt. The ladder additionally throws `InvariantViolation` on any attempted upgrade.
 
-## Scope of v0.1 — build in this order
+## Current scope
 
-**In scope, in priority order:** the exactly-once engine (Gate 4) and its chaos matrix, the MCP proxy, Gate 1 (scope) and Gate 2 (value authorization), the scenario suite, Gate 3 (ceilings, velocity and the fee budget), Gate 6 (provenance and manifest pinning), `interlock init`, the operator console, deploy and npm publish.
+Work follows [ROADMAP.md](ROADMAP.md) phase by phase. The current phase is the `careful` baseline, then P0. The sequencing rules in ROADMAP.md are binding. The hackathon cut order no longer applies.
 
 **Gate 5 (the LLM purpose judge) is opt-in and OFF by default**, behind `--purpose-check`, advisory, and typed so its verdict union cannot contain `ALLOW`. That is a design decision recorded in ADR-0005, not a time cut: with it off, the money path is provably deterministic end to end, which is the claim.
 
-**Out of scope entirely:** Postgres, multi-tenancy, auth beyond a shared bearer token, retry tuning / circuit breakers / dead-letter queues (`QUARANTINED` plus a human is the correct answer at this scale), a landing page beyond a README.
-
-If a checkpoint goes red, cut in this order: console polish → `init` → Gate 6 → Gate 3 → the LangGraph harness → scenarios 30 → 20. **Never cut Gate 4 or the scenario suite.**
+**Out of scope entirely:** multi-tenancy, retry tuning / circuit breakers / dead-letter queues (`QUARANTINED` plus a human is the correct answer at this scale), a landing page beyond a README.
 
 ## Testing
 
