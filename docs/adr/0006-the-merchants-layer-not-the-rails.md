@@ -1,6 +1,6 @@
 # ADR-0006 — Interlock is the merchant's layer, not a copy of the rail's
 
-**Status:** proposed · **Date:** 2026-09-29
+**Status:** accepted · **Date:** 2026-10-11
 
 ## Context
 
