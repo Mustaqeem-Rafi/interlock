@@ -352,6 +352,65 @@ function renderHeadline(report: BenchReport, flags: readonly HarnessFlag[]): str
 }
 
 // ---------------------------------------------------------------------------
+// 1b. Against a careful agent
+// ---------------------------------------------------------------------------
+
+/**
+ * The careful harness without and with the gate, per family.
+ *
+ * Same agent, same scenarios, same scripted policy in both columns, and that
+ * agent already sends an idempotency key, so the difference between the columns
+ * is the part of Interlock that a key does not buy. Only numbers the scorer
+ * computed: no delta column, because a delta computed here would be a second,
+ * untested implementation of a metric.
+ */
+const CAREFUL_HEADERS: readonly string[] = [
+  'Family',
+  'Attack success, careful direct',
+  'Attack success, careful gated',
+  'Money at risk, careful direct',
+  'Money at risk, careful gated',
+];
+
+function renderAgainstCareful(report: BenchReport): string {
+  const { scored, observed } = groupReport(report);
+  const direct = scored.get(keyOf('careful', 'direct'));
+  const gated = scored.get(keyOf('careful', 'gated'));
+  const seen = sumOf(MODE_ORDER, (mode) => observed.get(keyOf('careful', mode)) ?? 0);
+  const parts = ['## Against a careful agent', '', provenanceLine(seen, report.provenance), ''];
+
+  if (direct === undefined && gated === undefined) {
+    parts.push(`${inlineCode('careful')} did not run in this report. Its absence is not a pass.`);
+    return parts.join('\n');
+  }
+
+  const inFamily = (score: ModeScore | undefined, family: Family): FamilyScore | undefined =>
+    score?.families.find((candidate) => candidate.family === family);
+  const rows: string[][] = [];
+  for (const family of FAMILY_ORDER) {
+    const d = inFamily(direct, family);
+    const g = inFamily(gated, family);
+    if (d === undefined && g === undefined) continue;
+    rows.push([
+      `${family} — ${FAMILY_TITLES[family]}`,
+      formatPercent(d?.attack_success_rate ?? null),
+      formatPercent(g?.attack_success_rate ?? null),
+      formatMoneyMinor(d?.money_at_risk_minor ?? null),
+      formatMoneyMinor(g?.money_at_risk_minor ?? null),
+    ]);
+  }
+  rows.push([
+    'All families',
+    formatPercent(direct?.attack_success_rate ?? null),
+    formatPercent(gated?.attack_success_rate ?? null),
+    formatMoneyMinor(direct?.money_at_risk_minor ?? null),
+    formatMoneyMinor(gated?.money_at_risk_minor ?? null),
+  ]);
+  parts.push(renderTable(CAREFUL_HEADERS, rows));
+  return parts.join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // 2. Per-family tables
 // ---------------------------------------------------------------------------
 
@@ -595,6 +654,7 @@ export function renderBenchReport(report: BenchReport): string {
   return (
     [
       renderHeadline(report, flags),
+      renderAgainstCareful(report),
       renderFamilies(report, flags),
       renderScenarios(report, flags),
       renderNotes(report),

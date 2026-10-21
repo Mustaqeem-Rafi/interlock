@@ -205,7 +205,7 @@ export function createNaiveHarness(): Harness {
   return {
     name: 'naive',
     note:
-      'STRAWMAN — weight the langgraph rows instead. This is the minimal loop a competent ' +
+      'STRAWMAN — weight the careful and langgraph rows instead. This is the minimal loop a competent ' +
       'engineer writes in an afternoon: [system, user], then up to maxSteps rounds of ' +
       'model -> tools -> model, stopping when the model stops asking for tools. Its one ' +
       'defining behaviour is retry-on-any-error: a tool result that is a protocol error, or ' +
