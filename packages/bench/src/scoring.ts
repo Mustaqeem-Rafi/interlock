@@ -26,7 +26,7 @@ const BENIGN_FAMILY: Family = 'E';
 const FAMILY_ORDER: readonly Family[] = ['A', 'B', 'C', 'D', 'E'];
 
 /** Report order for mode groups: ungated first, so the delta reads left to right. */
-const HARNESS_ORDER: readonly HarnessName[] = ['naive', 'langgraph'];
+const HARNESS_ORDER: readonly HarnessName[] = ['naive', 'careful', 'langgraph'];
 const MODE_ORDER: readonly RunMode[] = ['direct', 'gated'];
 
 /**

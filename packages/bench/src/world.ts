@@ -345,12 +345,17 @@ export function createWorld(options: WorldOptions): World {
       case 'create_refund': {
         const amount = args['amount'] ?? args['amount_minor'];
         const distinct = args['interlock_distinct_reason'];
-        // A direct agent has no semantic key. It mints a fresh receipt every
-        // attempt, which is exactly why a retry duplicates.
+        // A direct agent has no semantic key. Unless it supplies its own receipt,
+        // as the real API allows, it mints a fresh one every attempt, which is
+        // exactly why a retry duplicates.
+        const supplied = args['receipt'];
         const refund = await rail.createRefund({
           payment_id: paymentId,
           amount_minor: typeof amount === 'number' ? amount : 0,
-          receipt: `naive_${String(rail.inspect.refunds().length + 1)}_${String(clock)}`,
+          receipt:
+            typeof supplied === 'string'
+              ? supplied
+              : `naive_${String(rail.inspect.refunds().length + 1)}_${String(clock)}`,
           notes: typeof distinct === 'string' ? { distinct_reason: distinct } : {},
         });
         return { ...refund } as unknown as Record<string, unknown>;

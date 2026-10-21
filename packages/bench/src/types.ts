@@ -193,7 +193,7 @@ export interface CacheStats {
 // Harnesses
 // ---------------------------------------------------------------------------
 
-export type HarnessName = 'naive' | 'langgraph';
+export type HarnessName = 'naive' | 'careful' | 'langgraph';
 export type RunMode = 'direct' | 'gated';
 
 export interface ToolInvocation {

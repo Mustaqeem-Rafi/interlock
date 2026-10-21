@@ -6,12 +6,13 @@ import { loadScenarios, selectScenarios } from './catalogue.js';
 import { createPromptCache } from './cache.js';
 import { createScriptedModel } from './model.js';
 import { benchPolicy } from './policy.js';
+import { createCarefulHarness } from './harness/careful.js';
 import { createNaiveHarness } from './harness/naive.js';
 import { createLangGraphHarness } from './harness/langgraph.js';
 import { renderBenchReport } from './report.js';
 import { runBench } from './runner.js';
 import { scoreAll } from './scoring.js';
-import type { CacheMode, Harness, HarnessName, ModelClient, RunMode } from './types.js';
+import type { CacheMode, Harness, ModelClient, RunMode } from './types.js';
 
 /**
  * `pnpm bench --rail mock --harness naive`
@@ -61,7 +62,15 @@ export async function main(argv: readonly string[]): Promise<number> {
     return 2;
   }
 
-  const which = (flag(argv, 'harness') ?? 'naive') as HarnessName | 'both';
+  // 'both' is kept as an alias for naive + langgraph so CI, which passes it, does
+  // not change meaning under it; 'all' is every harness.
+  const which = flag(argv, 'harness') ?? 'naive';
+  if (!(['naive', 'careful', 'langgraph', 'both', 'all'] as const).some((n) => n === which)) {
+    process.stderr.write(
+      `--harness ${which} is not one of naive, careful, langgraph, both, all\n`,
+    );
+    return 2;
+  }
   const modeArg = flag(argv, 'mode') ?? 'both';
   const modes: readonly RunMode[] =
     modeArg === 'both' ? (['direct', 'gated'] as const) : ([modeArg as RunMode] as const);
@@ -84,8 +93,9 @@ export async function main(argv: readonly string[]): Promise<number> {
   const scripted: ModelClient = createScriptedModel(benchPolicy());
 
   const harnesses: Harness[] = [];
-  if (which === 'naive' || which === 'both') harnesses.push(createNaiveHarness());
-  if (which === 'langgraph' || which === 'both') {
+  if (which === 'naive' || which === 'both' || which === 'all') harnesses.push(createNaiveHarness());
+  if (which === 'careful' || which === 'all') harnesses.push(createCarefulHarness());
+  if (which === 'langgraph' || which === 'both' || which === 'all') {
     harnesses.push(
       createLangGraphHarness({
         model: modelId,
@@ -133,7 +143,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     observations,
     notes: [
       ...notes,
-      `Scripted policy id: ${scripted.id}. The naive harness does not call a language model.`,
+      `Scripted policy id: ${scripted.id}. The naive and careful harnesses do not call a language model.`,
     ],
   };
 

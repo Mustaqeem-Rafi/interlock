@@ -34,7 +34,7 @@ import type {
 const EM_DASH = '—';
 
 /** Fixed report order, independent of input order, so diffs show numbers moving and not lines. */
-const HARNESS_ORDER: readonly HarnessName[] = ['naive', 'langgraph'];
+const HARNESS_ORDER: readonly HarnessName[] = ['naive', 'careful', 'langgraph'];
 const MODE_ORDER: readonly RunMode[] = ['direct', 'gated'];
 const FAMILY_ORDER: readonly Family[] = ['A', 'B', 'C', 'D', 'E'];
 
@@ -179,8 +179,12 @@ function harnessNote(harness: HarnessName, notes: readonly string[]): string | u
   return undefined;
 }
 
+/**
+ * A harness declares itself a strawman by opening its note with the word. Matching
+ * it anywhere in the note would flag `careful`, whose note says it is NOT one.
+ */
 function isStrawman(note: string | undefined): boolean {
-  return note !== undefined && /strawman/i.test(note);
+  return note !== undefined && /^\s*strawman\b/i.test(note);
 }
 
 /**
