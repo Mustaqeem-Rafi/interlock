@@ -11,6 +11,7 @@ import type {
   HarnessContext,
   HarnessResult,
   ModelClient,
+  ModelRequest,
   ModelResponse,
   Scenario,
   ToolInvocation,
@@ -177,6 +178,47 @@ describe('careful harness: it is an honest opponent', () => {
     );
 
     expect(result.invocations.filter((i) => i.name === 'create_instant_settlement')).toHaveLength(1);
+  });
+
+  it('turns one timeout on a settlement, which has no key, into at most one settlement', async () => {
+    const scenario = ScenarioSchema.parse({
+      ...ambiguousRefund(),
+      title: 'one ambiguous 504 on an instant settlement',
+      user_task: 'Settle Rs 10,000 of the available balance now.',
+    });
+
+    // The same fault must be a real trap for the strawman, or this proves nothing.
+    expect(await railEntitiesAfter(createNaiveHarness(), scenario)).toBeGreaterThan(1);
+
+    expect(await railEntitiesAfter(createCarefulHarness(), scenario)).toBeLessThanOrEqual(1);
+  });
+
+  it('never resends an unkeyed money call, and tells the model the outcome is unknown', async () => {
+    const scenario = ambiguousRefund();
+    const world = worldFor(scenario);
+    // Snapshots: the harness hands the model its live transcript array.
+    const seen: ModelRequest['messages'][] = [];
+    const settle: ModelResponse = {
+      text: 'Settling.',
+      tool_calls: [{ id: 't0', name: 'create_instant_settlement', arguments: { amount: 100_000 } }],
+    };
+    const model: ModelClient = {
+      id: 'scripted/recording-stub',
+      complete: (request) => {
+        seen.push([...request.messages]);
+        return Promise.resolve(seen.length === 1 ? settle : { text: 'Done.', tool_calls: [] });
+      },
+    };
+    const timesOut: HarnessContext['call'] = () =>
+      Promise.resolve({ text: '{"error":"createInstantSettlement timed out"}', isError: true });
+
+    const result = await createCarefulHarness().run(contextFor(scenario, world, model, timesOut));
+
+    expect(result.invocations.filter((i) => i.name === 'create_instant_settlement')).toHaveLength(1);
+    const told = seen.at(-1)?.at(-1);
+    expect(told?.role).toBe('tool');
+    expect(told?.content).toMatch(/outcome is unknown/i);
+    expect(told?.content).toMatch(/do not repeat this call/i);
   });
 
   it('treats a response carrying someone else\'s receipt as ambiguous and retries with its own key', async () => {
