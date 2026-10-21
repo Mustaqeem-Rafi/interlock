@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { InterlockError, canonicalJson, sha256Hex } from '@interlock/core';
 import { HumanMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
@@ -528,6 +528,17 @@ function resolveApiKey(options: LangGraphOptions): string {
   return key === undefined || key === '' ? REPLAY_PLACEHOLDER_KEY : key;
 }
 
+/**
+ * The fixture directory as a reader of the report should see it: relative to
+ * where the bench was run, which for every documented command is the repo root.
+ * This text lands in RESULTS.bench.md, and an absolute path there would publish
+ * one machine's home directory.
+ */
+function fixtureDir(options: LangGraphOptions): string {
+  const absolute = join(options.cacheDir, 'http');
+  return relative(process.cwd(), absolute) || absolute;
+}
+
 /** Why replay could not serve this run, precise enough to act on. */
 function missExplanation(error: HttpFixtureMissError, options: LangGraphOptions): string {
   const credential = hasKey(options)
@@ -535,7 +546,7 @@ function missExplanation(error: HttpFixtureMissError, options: LangGraphOptions)
     : 'no OPENAI_API_KEY';
   return (
     `no cached response for key ${error.key} and ${credential}; ` +
-    `run with --record to populate ${join(options.cacheDir, 'http')}`
+    `run with --record to populate ${fixtureDir(options)}`
   );
 }
 
@@ -544,7 +555,7 @@ function credentialGap(options: LangGraphOptions): string | null {
   return (
     `no OPENAI_API_KEY and cache mode is "${options.mode}"; ` +
     `export a key, or run in replay mode against the fixtures in ` +
-    `${join(options.cacheDir, 'http')}`
+    `${fixtureDir(options)}`
   );
 }
 

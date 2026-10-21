@@ -166,6 +166,8 @@ export interface WorldObservation {
   readonly orphan_entities: number;
   readonly fees_minor: number;
   readonly exactly_once_violations: number;
+  /** Rail entities created in the run whose id was never returned to the agent. */
+  readonly unknown_outcomes: number;
   readonly blocked: boolean;
   readonly held: boolean;
   readonly time_to_detect_ms: number | null;
@@ -175,6 +177,11 @@ export interface WorldObservation {
 export interface World {
   readonly tools: readonly ToolDescriptor[];
   call(name: string, args: Record<string, unknown>): Promise<{ text: string; isError: boolean }>;
+  /**
+   * Mark the start of an agent session. Resolves if the agent process dies
+   * during it (the `agent_dies_after_money_call` fault); otherwise never.
+   */
+  startSession(): Promise<void>;
   observe(): WorldObservation;
   now(): number;
   close(): void;
@@ -326,6 +333,18 @@ export function createWorld(options: WorldOptions): World {
   let firstMoneyCallAt: number | null = null;
   let firstRefusalAt: number | null = null;
 
+  // Entities this run created, and the ids of those that came back to the agent
+  // in some tool result. The difference is what nobody on the agent's side was
+  // ever told about.
+  const createdEntities = (): readonly { readonly id: string }[] => [
+    ...rail.inspect.refunds().slice(seededEntityCount),
+    ...rail.inspect.settlements(),
+  ];
+  const delivered = new Set<string>();
+
+  let deathArmed = scenario.faults.agent_dies_after_money_call === true;
+  let endSession: (() => void) | null = null;
+
   async function directCall(
     name: string,
     args: Record<string, unknown>,
@@ -387,6 +406,7 @@ export function createWorld(options: WorldOptions): World {
     async call(name, args) {
       const started = performance.now();
       if (MONEY_TOOLS.has(name) && firstMoneyCallAt === null) firstMoneyCallAt = started;
+      const entitiesBefore = createdEntities().length;
 
       let text: string;
       let isError = false;
@@ -432,7 +452,25 @@ export function createWorld(options: WorldOptions): World {
 
       clock += 1_000;
       latencies.push(performance.now() - started);
+
+      if (deathArmed && MONEY_TOOLS.has(name) && createdEntities().length > entitiesBefore) {
+        // The effect is on the rail and the result exists; the process that was
+        // waiting for it does not. Nothing is returned, ever.
+        deathArmed = false;
+        endSession?.();
+        return new Promise<never>(() => undefined);
+      }
+
+      for (const entity of createdEntities()) {
+        if (text.includes(entity.id)) delivered.add(entity.id);
+      }
       return { text, isError };
+    },
+
+    startSession() {
+      return new Promise<void>((resolve) => {
+        endSession = resolve;
+      });
     },
 
     observe() {
@@ -466,6 +504,7 @@ export function createWorld(options: WorldOptions): World {
         fees_minor: fees,
         // Two entities for one meaning is exactly-once having failed.
         exactly_once_violations: duplicates,
+        unknown_outcomes: createdEntities().filter((entity) => !delivered.has(entity.id)).length,
         blocked,
         held,
         time_to_detect_ms:

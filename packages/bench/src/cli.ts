@@ -133,7 +133,9 @@ export async function main(argv: readonly string[]): Promise<number> {
 
   const report = {
     provenance: {
-      model_id: harnesses.some((h) => h.name === 'langgraph') ? modelId : scripted.id,
+      // Only langgraph calls a model. naive and careful run on the scripted
+      // policy, which is named in the notes and never stamped as a model.
+      models: harnesses.some((h) => h.name === 'langgraph') ? { langgraph: modelId } : {},
       commit_sha: commitSha(),
       timestamp: new Date().toISOString(),
       rail,

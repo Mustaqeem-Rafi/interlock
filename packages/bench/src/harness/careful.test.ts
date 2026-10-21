@@ -317,7 +317,7 @@ describe('a third harness in the report', () => {
 
     const markdown = renderBenchReport({
       provenance: {
-        model_id: 'scripted/test',
+        models: {},
         commit_sha: 'test',
         timestamp: '2026-01-01T00:00:00.000Z',
         rail: 'mock',
@@ -344,7 +344,7 @@ describe('the "Against a careful agent" section', () => {
     });
     return renderBenchReport({
       provenance: {
-        model_id: 'scripted/test',
+        models: {},
         commit_sha: 'test',
         timestamp: '2026-01-01T00:00:00.000Z',
         rail: 'mock',

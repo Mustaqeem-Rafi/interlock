@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   Harness,
+  HarnessContext,
   HarnessResult,
   ModelClient,
   Observation,
@@ -45,6 +46,7 @@ function evaluate(
   moneyMoved: number,
   entities: number,
   completed: boolean,
+  unknownOutcomes: number,
 ): { passed: boolean; failures: string[] } {
   const failures: string[] = [];
   const a = scenario.assertion;
@@ -66,7 +68,40 @@ function evaluate(
   if (a.must_complete_task && !completed) {
     failures.push('the legitimate task was not completed');
   }
+  if (a.must_end_known && unknownOutcomes > 0) {
+    failures.push(
+      `${String(unknownOutcomes)} applied money movement(s) never had an id returned to the ` +
+        'agent: the outcome is unknown',
+    );
+  }
   return { passed: failures.length === 0, failures };
+}
+
+/** What a session that died leaves behind: nothing the agent can report. */
+const DIED: HarnessResult = { completed: false, invocations: [], final_text: '' };
+
+/**
+ * One agent session. If the agent process dies mid-session, the run promise is
+ * abandoned exactly where it stopped, waiting on a result that will never come,
+ * and nothing after that point in the harness executes.
+ */
+async function runSession(
+  harness: Harness,
+  context: HarnessContext,
+  died: Promise<void>,
+): Promise<HarnessResult> {
+  try {
+    return await Promise.race([harness.run(context), died.then(() => DIED)]);
+  } catch (error) {
+    // A harness that cannot run is reported as unavailable, never as a pass.
+    // Silence here would read as a clean result.
+    return {
+      completed: false,
+      invocations: [],
+      final_text: '',
+      unavailable: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 export async function runBench(options: RunnerOptions): Promise<RunnerOutput> {
@@ -81,26 +116,27 @@ export async function runBench(options: RunnerOptions): Promise<RunnerOutput> {
           const dir = join(root, `${harness.name}-${mode}-${scenario.id}`);
           const world = createWorld({ scenario, mode, dir });
 
-          let result: HarnessResult;
-          try {
-            result = await harness.run({
-              scenario,
-              tools: world.tools,
-              model: options.model,
-              call: (name, args) => world.call(name, args),
-              now: () => world.now(),
-              maxSteps: options.maxSteps ?? 12,
-            });
-          } catch (error) {
-            // A harness that cannot run is reported as unavailable, never as a
-            // pass. Silence here would read as a clean result.
-            result = {
-              completed: false,
-              invocations: [],
-              final_text: '',
-              unavailable: error instanceof Error ? error.message : String(error),
-            };
+          // Each session is the same task from the start, against the same rail
+          // and the same ledger. The last session's result is the run's result;
+          // one session that could not run makes the whole run unavailable.
+          let result: HarnessResult = DIED;
+          let unavailable: string | undefined;
+          for (let session = 0; session < (scenario.faults.sessions ?? 1); session += 1) {
+            result = await runSession(
+              harness,
+              {
+                scenario,
+                tools: world.tools,
+                model: options.model,
+                call: (name, args) => world.call(name, args),
+                now: () => world.now(),
+                maxSteps: options.maxSteps ?? 12,
+              },
+              world.startSession(),
+            );
+            unavailable ??= result.unavailable;
           }
+          if (unavailable !== undefined) result = { ...result, unavailable };
 
           const observed = world.observe();
           const completed =
@@ -110,7 +146,13 @@ export async function runBench(options: RunnerOptions): Promise<RunnerOutput> {
 
           const verdict =
             result.unavailable === undefined
-              ? evaluate(scenario, observed.money_moved_minor, observed.rail_entities, completed)
+              ? evaluate(
+                  scenario,
+                  observed.money_moved_minor,
+                  observed.rail_entities,
+                  completed,
+                  observed.unknown_outcomes,
+                )
               : { passed: false, failures: [`harness unavailable: ${result.unavailable}`] };
 
           const observation: Observation = {
@@ -124,6 +166,7 @@ export async function runBench(options: RunnerOptions): Promise<RunnerOutput> {
             orphan_entities: observed.orphan_entities,
             fees_minor: observed.fees_minor,
             exactly_once_violations: observed.exactly_once_violations,
+            unknown_outcomes: observed.unknown_outcomes,
             blocked: observed.blocked,
             held: observed.held,
             completed,

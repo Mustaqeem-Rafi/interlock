@@ -145,14 +145,25 @@ function renderTable(headers: readonly string[], rows: readonly (readonly string
  * The line that goes directly under every table heading.
  *
  * `n` is the count for *that* table, not for the run, so a family table and the
- * headline table honestly disagree about it.
+ * headline table honestly disagree about it. A model is named only for the
+ * harnesses in `harnesses` that ran on one, each with its harness beside it, so
+ * a table of scripted-policy rows never carries a model name it did not use.
  */
-function provenanceLine(n: number, provenance: RunProvenance): string {
+function provenanceLine(
+  n: number,
+  provenance: RunProvenance,
+  harnesses: readonly HarnessName[],
+): string {
   const cache =
     `${String(provenance.cache.hits)} hit / ${String(provenance.cache.misses)} miss / ` +
     `${String(provenance.cache.writes)} write`;
+  const models = harnesses.flatMap((harness) => {
+    const model = provenance.models[harness];
+    return model === undefined ? [] : [`${inlineCode(model)} (${harness})`];
+  });
   return (
-    `_n = ${formatInteger(n)} · model ${inlineCode(provenance.model_id)} · ` +
+    `_n = ${formatInteger(n)} · ` +
+    (models.length === 0 ? '' : `model ${models.join(', ')} · `) +
     `commit ${inlineCode(provenance.commit_sha)} · ${inlineCode(provenance.timestamp)} · ` +
     `rail ${inlineCode(provenance.rail)} · seed ${formatInteger(provenance.seed)} · ` +
     `prompt cache ${cache}_`
@@ -339,7 +350,7 @@ function renderHeadline(report: BenchReport, flags: readonly HarnessFlag[]): str
   }
 
   const n = sumOf(report.scores, (score) => score.n);
-  const parts = ['## Benchmark', '', provenanceLine(n, report.provenance), ''];
+  const parts = ['## Benchmark', '', provenanceLine(n, report.provenance, HARNESS_ORDER), ''];
 
   parts.push(renderTable(HEADLINE_HEADERS, rows), '');
   parts.push(
@@ -377,7 +388,12 @@ function renderAgainstCareful(report: BenchReport): string {
   const direct = scored.get(keyOf('careful', 'direct'));
   const gated = scored.get(keyOf('careful', 'gated'));
   const seen = sumOf(MODE_ORDER, (mode) => observed.get(keyOf('careful', mode)) ?? 0);
-  const parts = ['## Against a careful agent', '', provenanceLine(seen, report.provenance), ''];
+  const parts = [
+    '## Against a careful agent',
+    '',
+    provenanceLine(seen, report.provenance, ['careful']),
+    '',
+  ];
 
   if (direct === undefined && gated === undefined) {
     parts.push(`${inlineCode('careful')} did not run in this report. Its absence is not a pass.`);
@@ -463,7 +479,7 @@ function renderFamilies(report: BenchReport, flags: readonly HarnessFlag[]): str
 
     if (modeScores.length === 0) {
       const seen = sumOf(MODE_ORDER, (mode) => observed.get(keyOf(harness, mode)) ?? 0);
-      parts.push(provenanceLine(seen, report.provenance), '');
+      parts.push(provenanceLine(seen, report.provenance, [harness]), '');
       parts.push(
         seen === 0
           ? '**This harness produced no observations in this run.** The section is kept empty ' +
@@ -485,7 +501,7 @@ function renderFamilies(report: BenchReport, flags: readonly HarnessFlag[]): str
     }
 
     const n = sumOf(modeScores, (score) => sumOf(score.families, (family) => family.n));
-    parts.push(provenanceLine(n, report.provenance), '');
+    parts.push(provenanceLine(n, report.provenance, [harness]), '');
 
     // The unavailability lines are emitted either way. A section that says only
     // "no rows" leaves the reader to guess whether the harness was skipped or
@@ -556,7 +572,7 @@ function scenarioRow(observation: Observation, flags: readonly HarnessFlag[]): r
 
 function renderScenarios(report: BenchReport, flags: readonly HarnessFlag[]): string {
   const parts = ['## Scenarios', ''];
-  parts.push(provenanceLine(report.observations.length, report.provenance), '');
+  parts.push(provenanceLine(report.observations.length, report.provenance, HARNESS_ORDER), '');
 
   if (report.observations.length === 0) {
     parts.push('**No scenario was observed in this run.**', '');

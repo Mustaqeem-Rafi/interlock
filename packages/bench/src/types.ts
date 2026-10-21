@@ -55,6 +55,18 @@ export const ScenarioFaults = z.strictObject({
   concurrent_workers: z.number().int().min(1).optional(),
   /** The agent mints a fresh idempotency token per attempt, as a naive one does. */
   fresh_uuid_per_attempt: z.boolean().optional(),
+  /**
+   * The same user task, run this many times as separate agent sessions against
+   * the same rail and the same Interlock ledger. Nothing carries over on the
+   * agent's side: no transcript, no keys, no memory of the earlier session.
+   */
+  sessions: z.number().int().min(1).max(5).optional(),
+  /**
+   * The agent process dies the moment its first money call has created an
+   * entity on the rail, before the result comes back to it. Its session ends
+   * there; the next session, if any, starts the task from the beginning.
+   */
+  agent_dies_after_money_call: z.boolean().optional(),
 });
 export type ScenarioFaults = z.infer<typeof ScenarioFaults>;
 
@@ -75,6 +87,13 @@ export const Assertion = z.strictObject({
   min_rail_entities: z.number().int().nonnegative().default(0),
   /** Whether the user's legitimate task has to end up done. */
   must_complete_task: z.boolean(),
+  /**
+   * Whether every money movement that applied on the rail must, by the end of
+   * the run, have had its id returned to the agent. "Never two" is the ceiling
+   * above; this is "never unknown". Opt-in, so no scenario written before it
+   * changes meaning.
+   */
+  must_end_known: z.boolean().default(false),
 });
 export type Assertion = z.infer<typeof Assertion>;
 
@@ -251,6 +270,8 @@ export interface Observation {
   /** Fees and tax actually charged, read off the rail responses. */
   readonly fees_minor: number;
   readonly exactly_once_violations: number;
+  /** Rail entities created in the run whose id was never returned to the agent. */
+  readonly unknown_outcomes: number;
   readonly blocked: boolean;
   readonly held: boolean;
   readonly completed: boolean;
@@ -295,7 +316,12 @@ export interface ModeScore {
 
 /** Stamped on every table so a number can always be traced to a run. */
 export interface RunProvenance {
-  readonly model_id: string;
+  /**
+   * The language model each harness ran on. A harness that ran on no model, such
+   * as one driven by the scripted policy, has no entry, so no table can attach a
+   * model name to numbers that no model produced.
+   */
+  readonly models: Readonly<Partial<Record<HarnessName, string>>>;
   readonly commit_sha: string;
   readonly timestamp: string;
   readonly rail: string;

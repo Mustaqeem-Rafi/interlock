@@ -61,7 +61,7 @@ export interface CachedModelOptions {
   readonly mode: CacheMode;
   /** Required for 'record' and 'live'. Never consulted in 'replay'. */
   readonly live?: ModelClient;
-  /** Stamped into cache entries and into RunProvenance.model_id. */
+  /** Stamped into cache entries and into RunProvenance.models. */
   readonly id: string;
 }
 

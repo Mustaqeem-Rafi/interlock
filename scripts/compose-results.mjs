@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const FRAGMENTS = [
-  { file: 'RESULTS.bench.md', label: 'benchmark', command: 'pnpm bench --rail mock' },
+  { file: 'RESULTS.bench.md', label: 'benchmark', command: 'pnpm bench --rail mock --harness all' },
   { file: 'RESULTS.chaos.md', label: 'chaos matrix', command: 'pnpm chaos:matrix --trials 20' },
 ];
 
