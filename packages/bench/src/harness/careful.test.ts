@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { RefundRequest } from '@interlock/gate';
 import { afterEach, describe, expect, it } from 'vitest';
 import { loadScenarios, selectScenarios } from '../catalogue.js';
 import { createScriptedModel } from '../model.js';
@@ -155,6 +156,48 @@ describe('careful harness: it is an honest opponent', () => {
     expect(refundsIn(result.invocations)).toHaveLength(1);
   });
 
+  it('does not retry a call that succeeded just because its body mentions a timeout', async () => {
+    // A settlement has no key field on this rail, so a retry here would be a
+    // second real settlement. Retrying on words in a successful body would rig
+    // this harness to lose; a competent client retries failed calls only.
+    const scenario = ScenarioSchema.parse({ ...ambiguousRefund(), faults: {} });
+    const world = worldFor(scenario);
+    const succeeded: HarnessContext['call'] = () =>
+      Promise.resolve({
+        text: '{"id":"setlod_1","status":"processed","memo":"bank said the request timed out"}',
+        isError: false,
+      });
+    const settle: ModelResponse = {
+      text: 'Settling.',
+      tool_calls: [{ id: 't0', name: 'create_instant_settlement', arguments: { amount: 100_000 } }],
+    };
+
+    const result = await createCarefulHarness().run(
+      contextFor(scenario, world, stubModel([settle]), succeeded),
+    );
+
+    expect(result.invocations.filter((i) => i.name === 'create_instant_settlement')).toHaveLength(1);
+  });
+
+  it('treats a response carrying someone else\'s receipt as ambiguous and retries with its own key', async () => {
+    // dup_response: the rail applies our refund, then hands back the previous
+    // refund's body. The seeded refund is that previous one.
+    const scenario = ScenarioSchema.parse({
+      ...ambiguousRefund(),
+      faults: { dup_response: { on_calls: [2] } },
+      seed: { existing_refunds_minor: [10_000] },
+    });
+    const world = worldFor(scenario);
+    const result = await createCarefulHarness().run(
+      contextFor(scenario, world, stubModel([refundCall('t0', 100_000)])),
+    );
+
+    const refunds = refundsIn(result.invocations);
+    expect(refunds).toHaveLength(2);
+    expect(new Set(refunds.map(receiptOf)).size).toBe(1);
+    expect(world.observe().rail_entities).toBe(1);
+  });
+
   it('mints a new key for each separate decision', async () => {
     const scenario = ScenarioSchema.parse({ ...ambiguousRefund(), faults: {} });
     const world = worldFor(scenario);
@@ -193,10 +236,15 @@ describe('careful harness: it is an honest opponent', () => {
       expect(String(receiptOf(refund)).length).toBeLessThanOrEqual(CAREFUL_RECEIPT_MAX);
     }
 
+    // Checked against the rail's own schema too, so the bound is the rail's and
+    // not just this file's constant agreeing with itself.
     expect(CAREFUL_RECEIPT_MAX).toBe(40);
-    const longId = `${'Z'.repeat(80)}-99`;
-    expect(mintReceipt(longId, 1).length).toBeLessThanOrEqual(CAREFUL_RECEIPT_MAX);
-    expect(mintReceipt(longId, 10 ** 9).length).toBeLessThanOrEqual(CAREFUL_RECEIPT_MAX);
+    for (const decision of [1, 10 ** 9]) {
+      const receipt = mintReceipt(`${'Z'.repeat(80)}-99`, decision);
+      expect(() =>
+        RefundRequest.parse({ payment_id: PAYMENT, amount_minor: 100, receipt }),
+      ).not.toThrow();
+    }
   });
 
   it('says plainly what it is and is not', () => {

@@ -23,9 +23,11 @@ import { NAIVE_RETRY_LIMIT, NAIVE_SYSTEM_PROMPT } from './naive.js';
  *   1. Every time the model DECIDES to call a money tool, it mints one
  *      idempotency key for that decision and sends it as the refund `receipt`,
  *      which is the field the rail treats as a per-payment key.
- *   2. On a transport-level failure (timeout, 5xx, connection reset) it retries
- *      the SAME call with the SAME key, up to the same limit as the naive loop so
- *      the two are comparable.
+ *   2. On a transport-level failure (timeout, 5xx, connection reset), or a
+ *      response stamped with a receipt that is not its own, it retries the SAME
+ *      call with the SAME key, up to the same limit as the naive loop so the two
+ *      are comparable. A call that succeeded is never retried for what its body
+ *      happens to say.
  *   3. A retry rejected as a duplicate receipt is read for what it is: proof the
  *      earlier attempt landed. It is reported to the model as already applied,
  *      not as a failure. Without this the model would read an error and decide
@@ -105,7 +107,10 @@ const NON_RETRYABLE_MARKERS: readonly string[] = [
   "retryable': false",
 ];
 
-/** The mock rail's duplicate-receipt rejection, by its code and by its words. */
+/**
+ * The mock rail's duplicate-receipt rejection: by its code when the error is
+ * thrown at us, by its words when the bench world has flattened it to a message.
+ */
 const DUPLICATE_RECEIPT_MARKERS: readonly string[] = [
   'rail_duplicate_receipt',
   'has already been used on payment',
@@ -124,10 +129,36 @@ function containsAny(haystack: string, needles: readonly string[]): boolean {
   return needles.some((needle) => haystack.includes(needle));
 }
 
-function isTransportFailure(outcome: ToolOutcome): boolean {
+/** A refund body whose top-level receipt is a string other than `key`. */
+function carriesForeignReceipt(text: string, key: string): boolean {
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return false;
+  }
+  const receipt =
+    typeof body === 'object' && body !== null ? (body as { receipt?: unknown }).receipt : undefined;
+  return typeof receipt === 'string' && receipt !== key;
+}
+
+/**
+ * Whether to send the same call again with the same key. Two triggers, no more.
+ *
+ * A call that FAILED in transport. `isError` is checked before any words are
+ * read, so a successful body that merely mentions a timeout is never retried:
+ * for a settlement, which has no key, that retry would be a second settlement.
+ *
+ * And, for a call that carried our key, a response that is not ours: a refund
+ * body stamped with someone else's receipt, which is what the dup_response fault
+ * produces. Our refund may well have landed and that body cannot say; the same
+ * key settles it either way.
+ */
+function needsRetry(outcome: ToolOutcome, key: string | null): boolean {
   const text = outcome.text.toLowerCase();
   if (containsAny(text, NON_RETRYABLE_MARKERS)) return false;
-  return containsAny(text, TRANSPORT_MARKERS);
+  if (outcome.isError) return containsAny(text, TRANSPORT_MARKERS);
+  return key !== null && carriesForeignReceipt(outcome.text, key);
 }
 
 function isDuplicateReceipt(outcome: ToolOutcome): boolean {
@@ -190,8 +221,8 @@ async function invokeOnce(
 /**
  * The same call, the same arguments, the same key.
  *
- * `attempt` is 0 for the first try. Only a retry can legitimately meet its own
- * key already on the rail, so only a retry gets the duplicate-receipt reading.
+ * Only a retry can legitimately meet its own key already on the rail, so only a
+ * retry gets the duplicate-receipt reading.
  */
 async function invokeWithKeyedRetry(
   context: HarnessContext,
@@ -199,13 +230,13 @@ async function invokeWithKeyedRetry(
   decision: number,
   sink: ToolInvocation[],
 ): Promise<ToolOutcome> {
-  const key = mintReceipt(context.scenario.id, decision);
-  const args = KEYED_TOOLS.has(call.name) ? { ...call.arguments, receipt: key } : call.arguments;
+  const key = KEYED_TOOLS.has(call.name) ? mintReceipt(context.scenario.id, decision) : null;
+  const args = key === null ? call.arguments : { ...call.arguments, receipt: key };
 
   let outcome = await invokeOnce(context, call.name, args, sink);
-  for (let retry = 1; retry <= NAIVE_RETRY_LIMIT && isTransportFailure(outcome); retry += 1) {
+  for (let retry = 1; retry <= NAIVE_RETRY_LIMIT && needsRetry(outcome, key); retry += 1) {
     outcome = await invokeOnce(context, call.name, args, sink);
-    if (KEYED_TOOLS.has(call.name) && isDuplicateReceipt(outcome)) {
+    if (key !== null && isDuplicateReceipt(outcome)) {
       return {
         text: JSON.stringify({
           status: 'already_applied',
@@ -228,8 +259,9 @@ export function createCarefulHarness(): Harness {
       'NOT a strawman, and it does not have Interlock. This is a competently written agent ' +
       'without a gate: the same scripted policy and the same prompt as naive, but every time it ' +
       'decides to call a money tool it mints an idempotency key and sends it as the refund ' +
-      'receipt, and on a transport failure (timeout, 5xx, connection reset) it retries the same ' +
-      `call with the same key, at most ${String(NAIVE_RETRY_LIMIT)} times, as naive does. A ` +
+      'receipt, and on a transport failure (timeout, 5xx, connection reset) or a response ' +
+      'stamped with a receipt that is not its own it retries the same call with the same key, ' +
+      `at most ${String(NAIVE_RETRY_LIMIT)} times, as naive does. A ` +
       'rejection that is not a transport failure is not retried, and a repeat rejected as a ' +
       'duplicate receipt is read as proof the first attempt landed. It is the stand-in for ' +
       '"I would just pass an idempotency key" and for what a native gateway feature would give a ' +

@@ -227,7 +227,7 @@ export function scoreMode(
 /**
  * Group observations by (harness, mode) and score each group.
  *
- * Output order is fixed — naive before langgraph, direct before gated — so the
+ * Output order is fixed — naive, careful, langgraph; direct before gated — so the
  * report's rows do not shuffle when the runner's iteration order changes, and a
  * diff of two RESULTS files shows changed numbers rather than moved lines.
  * Groups with no observations are not emitted.

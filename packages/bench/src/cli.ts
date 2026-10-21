@@ -87,9 +87,10 @@ export async function main(argv: readonly string[]): Promise<number> {
   const apiKey = process.env['OPENAI_API_KEY'];
   const modelId = flag(argv, 'model') ?? process.env['INTERLOCK_BENCH_MODEL'] ?? 'gpt-4o-mini';
 
-  // The naive strawman runs on a deterministic scripted policy, not a model.
-  // That is stated in the report rather than quietly assumed: any number it
-  // produces is a fact about our harness, not about model behaviour.
+  // The naive strawman and the careful baseline run on a deterministic scripted
+  // policy, not a model. That is stated in the report rather than quietly
+  // assumed: any number they produce is a fact about our harness, not about
+  // model behaviour.
   const scripted: ModelClient = createScriptedModel(benchPolicy());
 
   const harnesses: Harness[] = [];
@@ -115,7 +116,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     scenarios,
     harnesses,
     modes,
-    // The naive harness runs on the scripted policy; the langgraph harness
+    // The naive and careful harnesses run on the scripted policy; the langgraph harness
     // drives its own stock ChatOpenAI behind an HTTP-level cache and ignores
     // this. Neither path invents a model response.
     model: scripted,
