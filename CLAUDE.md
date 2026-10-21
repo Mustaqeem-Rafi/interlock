@@ -4,7 +4,7 @@
 
 An MCP proxy that sits between an AI agent and a payment API so the agent **cannot pay twice, and cannot pay more than it was authorised to**. Every tool call becomes a *proposed action* that must earn a decision before it reaches the rail.
 
-Submission for the Razorpay AI Buildathon, Track 01. **Hard deadline Saturday 5 Sep 23:59 IST; submit target 21:00.** Assume severe time pressure on every decision: prefer the smaller correct thing over the larger complete thing.
+Interlock was the Razorpay AI Buildathon Track 01 entry, shipped as interlock-mcp@0.2.0, and is now an open-source product; work follows [ROADMAP.md](ROADMAP.md).
 
 ## The one guarantee everything serves
 
@@ -62,21 +62,29 @@ Node 22, TypeScript, pnpm workspaces, Zod at every boundary, `better-sqlite3` (s
 
 ```
 packages/
-  core/         canonical.ts, hash.ts, sik.ts, types + Zod schemas
-  store/        schema.sql, intents.ts, audit.ts  (better-sqlite3)
-  gate/
-    proxy/      MCP server (in) + MCP client (out)
-    gates/      g1_scope.ts, g2_value.ts, ladder.ts
-    exactly-once/  wal.ts, machine.ts, reconciler.ts, recovery.ts
-    rail/       rail.ts (interface), mock.ts, razorpay.ts
-    api/        http surface + SSE
-  chaos/        fault-injecting rail + kill-point matrix runner
-  bench/        scenario runner, naive harness
+  core/src/     canonical.ts, hash.ts, sik.ts, env.ts, errors.ts, index.ts
+    schemas/    action.ts, decision.ts, intent.ts, mandate.ts, primitives.ts, index.ts  (Zod)
+  store/
+    schema.sql
+    src/        db.ts, intents.ts, audit.ts, chain.ts, decisions.ts, recon.ts, errors.ts, index.ts  (better-sqlite3)
+  gate/src/
+    proxy/      engine.ts, server.ts, upstream.ts, manifest.ts, responses.ts, index.ts  (MCP server in + MCP client out)
+    gates/      g1_scope.ts, g2_value.ts, g3_limits.ts, g6_provenance.ts, ladder.ts, resolver.ts, index.ts
+    exactly-once/  wal.ts, machine.ts, propose.ts, reconciler.ts, recovery.ts, sweep.ts, index.ts
+    rail/       rail.ts (interface), mock.ts, razorpay.ts, errors.ts, index.ts
+    api/        server.ts, routes.ts, console-api.ts, operations.ts, auth.ts, readiness.ts, stream.ts  (http surface + SSE)
+    bin/        interlock-mcp.ts, interlock-console.ts, interlock-init.ts
+    init/       author.ts, cli.ts, questions.ts
+    kill-points.ts, index.ts
+  chaos/src/    child.ts, matrix.ts, rail-state.ts, results.ts, verdict.ts, errors.ts, index.ts  (fault-injecting rail + kill-point matrix runner)
+  bench/src/    runner.ts, scoring.ts, report.ts, world.ts, policy.ts, model.ts, cache.ts, catalogue.ts, cli.ts, types.ts, index.ts  (scenario runner, naive harness)
+    harness/    naive.ts, langgraph.ts
+    scenarios/  family-a.ts … family-e.ts, index.ts
 ```
 
-## The model's place — say this in the video, enforce it in the type system
+## The model's place — enforce it in the type system
 
-The money path is **100% deterministic**. There is no model in the decision path at all in v0.1. The mandate is a machine-checkable file a human approves.
+The money path is **100% deterministic**. There is no model in the decision path at all. The mandate is a machine-checkable file a human approves.
 
 If a model gate is ever added, its return type must be `verdict: 'HOLD' | 'BLOCK'` — the union does not contain `ALLOW`, so it *cannot* express an upgrade. That is a type, not a prompt. The ladder additionally throws `InvariantViolation` on any attempted upgrade.
 
